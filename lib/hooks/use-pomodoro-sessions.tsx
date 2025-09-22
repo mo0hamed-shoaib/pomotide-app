@@ -1,0 +1,132 @@
+"use client"
+
+import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "./use-auth"
+import type { TimerState } from "@/components/timer/pomodoro-timer"
+
+interface PomodoroSession {
+  id: string
+  taskId: string | null
+  sessionType: TimerState
+  durationMinutes: number
+  productivityRating?: number
+  completedAt: Date
+}
+
+export function usePomodoroSessions() {
+  const { user } = useAuth()
+  const supabase = createClient()
+
+  const STORAGE_KEY = "pomodoro_sessions"
+
+  // Load sessions from localStorage
+  const loadFromLocalStorage = (): PomodoroSession[] => {
+    if (typeof window === "undefined") return []
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  }
+
+  // Save sessions to localStorage
+  const saveToLocalStorage = (sessions: PomodoroSession[]) => {
+    if (typeof window === "undefined") return
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
+    } catch (error) {
+      console.error("Error saving to localStorage:", error)
+    }
+  }
+
+  const recordSession = async (
+    taskId: string | null,
+    sessionType: TimerState,
+    durationMinutes: number,
+    productivityRating?: number,
+  ) => {
+    if (!user) {
+      const newSession: PomodoroSession = {
+        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        taskId,
+        sessionType,
+        durationMinutes,
+        productivityRating,
+        completedAt: new Date(),
+      }
+      const sessions = loadFromLocalStorage()
+      const updatedSessions = [newSession, ...sessions]
+      saveToLocalStorage(updatedSessions)
+      return
+    }
+
+    try {
+      const { error } = await supabase.from("pomodoro_sessions").insert({
+        user_id: user.id,
+        task_id: taskId,
+        session_type: sessionType,
+        duration_minutes: durationMinutes,
+        productivity_rating: productivityRating,
+      })
+
+      if (error) throw error
+    } catch (error) {
+      console.error("Error recording session:", error)
+    }
+  }
+
+  const getSessionStats = async (timeRange: "week" | "month" | "year" = "week") => {
+    if (!user) {
+      const sessions = loadFromLocalStorage()
+      const startDate = new Date()
+      switch (timeRange) {
+        case "week":
+          startDate.setDate(startDate.getDate() - 7)
+          break
+        case "month":
+          startDate.setMonth(startDate.getMonth() - 1)
+          break
+        case "year":
+          startDate.setFullYear(startDate.getFullYear() - 1)
+          break
+      }
+
+      return sessions.filter((session) => new Date(session.completedAt) >= startDate)
+    }
+
+    try {
+      const startDate = new Date()
+      switch (timeRange) {
+        case "week":
+          startDate.setDate(startDate.getDate() - 7)
+          break
+        case "month":
+          startDate.setMonth(startDate.getMonth() - 1)
+          break
+        case "year":
+          startDate.setFullYear(startDate.getFullYear() - 1)
+          break
+      }
+
+      const { data, error } = await supabase
+        .from("pomodoro_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("completed_at", startDate.toISOString())
+        .order("completed_at", { ascending: true })
+
+      if (error) throw error
+
+      return data
+    } catch (error) {
+      console.error("Error fetching session stats:", error)
+      return null
+    }
+  }
+
+  return {
+    recordSession,
+    getSessionStats,
+  }
+}
