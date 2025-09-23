@@ -1,20 +1,35 @@
-"use client"
+"use client";
 
-import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft, Clock, Calendar, Flame, CheckCircle } from "lucide-react"
-import Link from "next/link"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts"
-import { useAuth } from "@/lib/hooks/use-auth"
+import { useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Clock, Calendar, Flame, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  LineChart,
+  Line,
+  Dot,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { useAuth } from "@/lib/hooks/use-auth";
 
-type TimeRange = "week" | "month" | "year"
+type TimeRange = "week" | "month" | "year";
 
 export default function StatisticsPage() {
-  const { user, loading } = useAuth()
-  const [timeRange, setTimeRange] = useState<TimeRange>("week")
+  const { user, loading } = useAuth();
+  const [timeRange, setTimeRange] = useState<TimeRange>("week");
 
   // Mock data - will be replaced with real data from database
   const mockSessions = [
@@ -32,35 +47,60 @@ export default function StatisticsPage() {
     { date: "2024-01-20", type: "work", duration: 25, productivity: 4 },
     { date: "2024-01-21", type: "work", duration: 25, productivity: 5 },
     { date: "2024-01-21", type: "work", duration: 25, productivity: 4 },
-  ]
+  ];
 
   const mockTasks = [
-    { id: "1", title: "Design System Updates", completedPomodoros: 8, estimatedPomodoros: 6, status: "completed" },
-    { id: "2", title: "API Integration", completedPomodoros: 4, estimatedPomodoros: 5, status: "in_progress" },
-    { id: "3", title: "User Testing", completedPomodoros: 3, estimatedPomodoros: 3, status: "completed" },
-  ]
+    {
+      id: "1",
+      title: "Design System Updates",
+      completedPomodoros: 8,
+      estimatedPomodoros: 6,
+      status: "completed",
+    },
+    {
+      id: "2",
+      title: "API Integration",
+      completedPomodoros: 4,
+      estimatedPomodoros: 5,
+      status: "in_progress",
+    },
+    {
+      id: "3",
+      title: "User Testing",
+      completedPomodoros: 3,
+      estimatedPomodoros: 3,
+      status: "completed",
+    },
+  ];
 
   const stats = useMemo(() => {
-    const workSessions = mockSessions.filter((s) => s.type === "work")
-    const totalMinutes = workSessions.reduce((sum, s) => sum + s.duration, 0)
-    const totalHours = Math.floor(totalMinutes / 60)
-    const avgProductivity = workSessions.reduce((sum, s) => sum + s.productivity, 0) / workSessions.length
-    const uniqueDays = new Set(workSessions.map((s) => s.date)).size
-    const completedTasks = mockTasks.filter((t) => t.status === "completed").length
+    const workSessions = mockSessions.filter((s) => s.type === "work");
+    const totalMinutes = workSessions.reduce((sum, s) => sum + s.duration, 0);
+    const totalHours = Math.floor(totalMinutes / 60);
+    const avgProductivity =
+      workSessions.reduce((sum, s) => sum + s.productivity, 0) /
+      workSessions.length;
+    const uniqueDays = new Set(workSessions.map((s) => s.date)).size;
+    const completedTasks = mockTasks.filter(
+      (t) => t.status === "completed"
+    ).length;
 
     // Calculate streak (consecutive days with sessions)
-    const dates = Array.from(new Set(workSessions.map((s) => s.date))).sort()
-    let currentStreak = 0
-    const today = new Date().toISOString().split("T")[0]
+    const dates = Array.from(new Set(workSessions.map((s) => s.date))).sort();
+    let currentStreak = 0;
+    const today = new Date().toISOString().split("T")[0];
 
     for (let i = dates.length - 1; i >= 0; i--) {
-      const date = dates[i]
-      const daysDiff = Math.floor((new Date(today).getTime() - new Date(date).getTime()) / (1000 * 60 * 60 * 24))
+      const date = dates[i];
+      const daysDiff = Math.floor(
+        (new Date(today).getTime() - new Date(date).getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
 
       if (daysDiff === currentStreak) {
-        currentStreak++
+        currentStreak++;
       } else {
-        break
+        break;
       }
     }
 
@@ -72,31 +112,58 @@ export default function StatisticsPage() {
       dayStreak: currentStreak,
       completedTasks,
       totalPomodoros: workSessions.length,
-    }
-  }, [])
+    };
+  }, []);
 
   const chartData = useMemo(() => {
-    const sessionsByDate = mockSessions.reduce(
-      (acc, session) => {
-        if (!acc[session.date]) {
-          acc[session.date] = { date: session.date, pomodoros: 0, productivity: 0, count: 0 }
-        }
-        if (session.type === "work") {
-          acc[session.date].pomodoros++
-          acc[session.date].productivity += session.productivity
-          acc[session.date].count++
-        }
-        return acc
-      },
-      {} as Record<string, { date: string; pomodoros: number; productivity: number; count: number }>,
-    )
+    const sessionsByDate = mockSessions.reduce((acc, session) => {
+      if (!acc[session.date]) {
+        acc[session.date] = {
+          date: session.date,
+          pomodoros: 0,
+          productivity: 0,
+          count: 0,
+        };
+      }
+      if (session.type === "work") {
+        acc[session.date].pomodoros++;
+        acc[session.date].productivity += session.productivity;
+        acc[session.date].count++;
+      }
+      return acc;
+    }, {} as Record<string, { date: string; pomodoros: number; productivity: number; count: number }>);
 
     return Object.values(sessionsByDate).map((day) => ({
-      date: new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: new Date(day.date).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
       pomodoros: day.pomodoros,
-      productivity: day.count > 0 ? Math.round((day.productivity / day.count) * 10) / 10 : 0,
-    }))
-  }, [])
+      productivity:
+        day.count > 0
+          ? Math.round((day.productivity / day.count) * 10) / 10
+          : 0,
+      // Map productivity (1-5) to a color scale using chart CSS variables
+      productivityColor:
+        day.count > 0
+          ? `hsl(var(--chart-${Math.min(
+              5,
+              Math.max(1, Math.round(day.productivity / day.count))
+            )}))`
+          : `hsl(var(--chart-4))`,
+    }));
+  }, []);
+
+  const chartConfig = {
+    pomodoros: {
+      label: "Pomodoros",
+      color: "var(--chart-1)",
+    },
+    productivity: {
+      label: "Productivity",
+      color: "var(--chart-3)",
+    },
+  } satisfies ChartConfig;
 
   if (loading) {
     return (
@@ -106,7 +173,7 @@ export default function StatisticsPage() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -138,7 +205,10 @@ export default function StatisticsPage() {
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
           {/* Time Range Selector */}
-          <Tabs value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
+          <Tabs
+            value={timeRange}
+            onValueChange={(value) => setTimeRange(value as TimeRange)}
+          >
             <TabsList className="grid w-full max-w-md grid-cols-3">
               <TabsTrigger value="week">Week</TabsTrigger>
               <TabsTrigger value="month">Month</TabsTrigger>
@@ -150,45 +220,67 @@ export default function StatisticsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Hours Focused</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Hours Focused
+                    </CardTitle>
                     <Clock className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stats.totalHours}h</div>
-                    <p className="text-xs text-muted-foreground">{stats.totalMinutes} minutes total</p>
+                    <div className="text-2xl font-bold">
+                      {stats.totalHours}h
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.totalMinutes} minutes total
+                    </p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Days Accessed</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Days Accessed
+                    </CardTitle>
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stats.daysAccessed}</div>
-                    <p className="text-xs text-muted-foreground">Active days this {timeRange}</p>
+                    <div className="text-2xl font-bold">
+                      {stats.daysAccessed}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Active days this {timeRange}
+                    </p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Day Streak</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Day Streak
+                    </CardTitle>
                     <Flame className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{stats.dayStreak}</div>
-                    <p className="text-xs text-muted-foreground">Consecutive active days</p>
+                    <p className="text-xs text-muted-foreground">
+                      Consecutive active days
+                    </p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Total Tasks
+                    </CardTitle>
                     <CheckCircle className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stats.completedTasks}</div>
-                    <p className="text-xs text-muted-foreground">Tasks completed</p>
+                    <div className="text-2xl font-bold">
+                      {stats.completedTasks}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Tasks completed
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -196,64 +288,121 @@ export default function StatisticsPage() {
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Pomodoros Chart */}
-                <Card>
-                  <CardHeader>
+                <Card className="flex flex-col">
+                  <CardHeader className="pb-4">
                     <CardTitle>Daily Pomodoros</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="date" className="text-muted-foreground" />
-                        <YAxis className="text-muted-foreground" />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
+                  <CardContent className="flex-1">
+                    <ChartContainer
+                      config={chartConfig}
+                      className="h-[280px] w-full"
+                    >
+                      <BarChart
+                        data={chartData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+                      >
+                        <CartesianGrid
+                          vertical={false}
+                          strokeDasharray="3 3"
+                          className="stroke-muted/30"
                         />
-                        <Bar dataKey="pomodoros" fill="url(#colorGradient)" radius={[4, 4, 0, 0]} />
-                        <defs>
-                          <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="hsl(var(--chart-1))" />
-                            <stop offset="100%" stopColor="hsl(var(--chart-2))" />
-                          </linearGradient>
-                        </defs>
+                        <XAxis
+                          dataKey="date"
+                          className="text-xs fill-muted-foreground"
+                          axisLine={false}
+                          tickLine={false}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <YAxis className="text-muted-foreground" />
+                        <ChartTooltip
+                          content={
+                            <ChartTooltipContent
+                              nameKey="pomodoros"
+                              formatter={(value: any) => [value, "pomodoros"]}
+                            />
+                          }
+                        />
+                        <Bar
+                          dataKey="pomodoros"
+                          fill="var(--color-pomodoros)"
+                          radius={[4, 4, 0, 0]}
+                          className="opacity-90 hover:opacity-100 transition-opacity"
+                        />
                       </BarChart>
-                    </ResponsiveContainer>
+                    </ChartContainer>
                   </CardContent>
                 </Card>
 
                 {/* Productivity Chart */}
-                <Card>
-                  <CardHeader>
+                <Card className="flex flex-col">
+                  <CardHeader className="pb-4">
                     <CardTitle>Productivity Trend</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="date" className="text-muted-foreground" />
-                        <YAxis domain={[1, 5]} className="text-muted-foreground" />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
+                  <CardContent className="flex-1">
+                    <ChartContainer
+                      config={chartConfig}
+                      className="h-[280px] w-full"
+                    >
+                      <LineChart
+                        data={chartData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+                      >
+                        <CartesianGrid
+                          vertical={false}
+                          strokeDasharray="3 3"
+                          className="stroke-muted/30"
+                        />
+                        <XAxis
+                          dataKey="date"
+                          className="text-xs fill-muted-foreground"
+                          axisLine={false}
+                          tickLine={false}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <YAxis
+                          domain={[1, 5]}
+                          className="text-muted-foreground"
+                        />
+                        <ChartTooltip
+                          content={
+                            <ChartTooltipContent
+                              nameKey="productivity"
+                              indicator="line"
+                              formatter={(value: any) => [
+                                value.toFixed ? value.toFixed(1) : value,
+                                "/5",
+                              ]}
+                            />
+                          }
                         />
                         <Line
-                          type="monotone"
+                          type="natural"
                           dataKey="productivity"
-                          stroke="hsl(var(--chart-3))"
-                          strokeWidth={3}
-                          dot={{ fill: "hsl(var(--chart-4))", strokeWidth: 2, r: 6 }}
-                          activeDot={{ r: 8, fill: "hsl(var(--chart-5))" }}
-                          connectNulls={true}
+                          stroke="var(--color-productivity)"
+                          strokeWidth={2.5}
+                          connectNulls={false}
+                          dot={{
+                            fill: "var(--color-productivity)",
+                            stroke: "hsl(var(--background))",
+                            strokeWidth: 2,
+                            r: 5,
+                          }}
+                          activeDot={{
+                            r: 6,
+                            stroke: "var(--color-productivity)",
+                            strokeWidth: 2,
+                            fill: "var(--color-productivity)",
+                          }}
+                          className="opacity-90 hover:opacity-100 transition-opacity"
                         />
                       </LineChart>
-                    </ResponsiveContainer>
+                    </ChartContainer>
                   </CardContent>
                 </Card>
               </div>
@@ -266,7 +415,9 @@ export default function StatisticsPage() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Average Productivity</span>
+                      <span className="text-sm font-medium">
+                        Average Productivity
+                      </span>
                       <div className="flex items-center gap-2">
                         <div className="flex gap-1">
                           {Array.from({ length: 5 }, (_, i) => (
@@ -276,32 +427,47 @@ export default function StatisticsPage() {
                                 i < Math.floor(stats.avgProductivity)
                                   ? "bg-chart-4"
                                   : i < stats.avgProductivity
-                                    ? "bg-chart-4 opacity-50"
-                                    : "bg-muted"
+                                  ? "bg-chart-4 opacity-50"
+                                  : "bg-muted"
                               }`}
                             />
                           ))}
                         </div>
-                        <Badge variant="secondary">{stats.avgProductivity}/5</Badge>
+                        <Badge variant="secondary">
+                          {stats.avgProductivity}/5
+                        </Badge>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-chart-1">{stats.totalPomodoros}</div>
-                        <div className="text-sm text-muted-foreground">Total Pomodoros</div>
+                        <div className="text-2xl font-bold text-chart-1">
+                          {stats.totalPomodoros}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Total Pomodoros
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-chart-2">
-                          {Math.round((stats.totalPomodoros / stats.daysAccessed) * 10) / 10}
+                          {Math.round(
+                            (stats.totalPomodoros / stats.daysAccessed) * 10
+                          ) / 10}
                         </div>
-                        <div className="text-sm text-muted-foreground">Avg per Day</div>
+                        <div className="text-sm text-muted-foreground">
+                          Avg per Day
+                        </div>
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-chart-3">
-                          {Math.round((stats.totalHours / stats.daysAccessed) * 10) / 10}h
+                          {Math.round(
+                            (stats.totalHours / stats.daysAccessed) * 10
+                          ) / 10}
+                          h
                         </div>
-                        <div className="text-sm text-muted-foreground">Avg Hours per Day</div>
+                        <div className="text-sm text-muted-foreground">
+                          Avg Hours per Day
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -312,5 +478,5 @@ export default function StatisticsPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }
