@@ -53,6 +53,9 @@ export default function HomePage() {
   } = useTotalCompleted();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [timerState, setTimerState] = useState<TimerState>("work");
+  const [externalStateSource, setExternalStateSource] = useState<
+    "tab" | "arrow" | undefined
+  >(undefined);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -305,7 +308,14 @@ export default function HomePage() {
                 <div className="flex justify-center mb-6">
                   <TimerTabs
                     currentState={timerState}
-                    onStateChange={handleTimerStateChange}
+                    onStateChange={(value) => {
+                      // Tabs are an explicit activation by the user from the page
+                      // treat them like arrow navigation and auto-start the timer.
+                      setTimerState(value);
+                      setExternalStateSource("tab");
+                      // keep the centralized handler in sync
+                      handleTimerStateChange(value);
+                    }}
                   />
                 </div>
 
@@ -320,6 +330,7 @@ export default function HomePage() {
                     onSessionComplete={handleSessionComplete}
                     onTimerStateChange={handleTimerStateChange}
                     externalState={timerState}
+                    externalStateSource={externalStateSource}
                     currentTask={
                       activeTask
                         ? {
