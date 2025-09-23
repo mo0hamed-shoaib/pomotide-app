@@ -1,23 +1,25 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Clock, Play, RotateCcw } from "lucide-react"
-import Link from "next/link"
+import { useState, useEffect } from "react";
+import { useSettings } from "@/lib/hooks/use-settings";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Clock, Play, RotateCcw } from "lucide-react";
+import Link from "next/link";
 
 interface Settings {
-  workDuration: number
-  shortBreakDuration: number
-  longBreakDuration: number
-  autoStartBreaks: boolean
-  autoStartPomodoros: boolean
-  autoCheckCompletedTasks: boolean
+  workDuration: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
+  autoStartBreaks: boolean;
+  autoStartPomodoros: boolean;
+  autoCheckCompletedTasks: boolean;
+  cycleLength?: number;
 }
 
 const defaultSettings: Settings = {
@@ -27,46 +29,88 @@ const defaultSettings: Settings = {
   autoStartBreaks: true,
   autoStartPomodoros: true,
   autoCheckCompletedTasks: false,
-}
+  cycleLength: 4,
+};
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<Settings>(defaultSettings)
-  const [hasChanges, setHasChanges] = useState(false)
+  const {
+    settings: savedSettings,
+    loading,
+    saveSettings: persistSettings,
+  } = useSettings();
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [hasChanges, setHasChanges] = useState(false);
 
-  const updateSetting = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
-    setHasChanges(true)
-  }
+  useEffect(() => {
+    if (!loading && savedSettings) {
+      setSettings(savedSettings as Settings);
+      setHasChanges(false);
+    }
+  }, [loading, savedSettings]);
+
+  const updateSetting = <K extends keyof Settings>(
+    key: K,
+    value: Settings[K]
+  ) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  const handleCycleLengthChange = (value: string) => {
+    const num = Number.parseInt(value) || 1;
+    const clamped = Math.max(1, Math.min(12, num));
+    updateSetting("cycleLength" as keyof Settings, clamped as any);
+  };
 
   const handleDurationChange = (
-    key: keyof Pick<Settings, "workDuration" | "shortBreakDuration" | "longBreakDuration">,
-    value: string,
+    key: keyof Pick<
+      Settings,
+      "workDuration" | "shortBreakDuration" | "longBreakDuration"
+    >,
+    value: string
   ) => {
-    const numValue = Number.parseInt(value) || 1
-    const clampedValue = Math.max(1, Math.min(120, numValue)) // 1-120 minutes
-    updateSetting(key, clampedValue)
-  }
+    const numValue = Number.parseInt(value) || 1;
+    const clampedValue = Math.max(1, Math.min(120, numValue)); // 1-120 minutes
+    updateSetting(key, clampedValue);
+  };
 
   const resetToDefaults = () => {
-    setSettings(defaultSettings)
-    setHasChanges(true)
-  }
+    setSettings(defaultSettings);
+    setHasChanges(true);
+    // show toast
+    (async () => {
+      try {
+        const { toast } = await import("sonner");
+        toast("Settings reset to defaults");
+      } catch {}
+    })();
+  };
 
-  const saveSettings = () => {
-    // TODO: Save to database when data persistence is integrated
-    console.log("Saving settings:", settings)
-    setHasChanges(false)
-    // Show success toast or feedback
-  }
+  const saveSettings = async () => {
+    try {
+      await persistSettings(settings);
+      setHasChanges(false);
+      try {
+        const { toast } = await import("sonner");
+        toast.success("Settings saved");
+      } catch {}
+    } catch (err) {
+      console.error("Error saving settings:", err);
+      try {
+        const { toast } = await import("sonner");
+        toast.error("Failed to save settings");
+      } catch {}
+    }
+  };
 
   const formatDuration = (minutes: number) => {
     if (minutes >= 60) {
-      const hours = Math.floor(minutes / 60)
-      const mins = minutes % 60
-      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     }
-    return `${minutes}m`
-  }
+    return `${minutes}m`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,10 +146,15 @@ export default function SettingsPage() {
               {/* Work Duration */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="work-duration" className="text-base font-medium">
+                  <Label
+                    htmlFor="work-duration"
+                    className="text-base font-medium"
+                  >
                     Pomodoro Duration
                   </Label>
-                  <Badge variant="outline">{formatDuration(settings.workDuration)}</Badge>
+                  <Badge variant="outline">
+                    {formatDuration(settings.workDuration)}
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-4">
                   <Input
@@ -114,23 +163,63 @@ export default function SettingsPage() {
                     min="1"
                     max="120"
                     value={settings.workDuration}
-                    onChange={(e) => handleDurationChange("workDuration", e.target.value)}
+                    onChange={(e) =>
+                      handleDurationChange("workDuration", e.target.value)
+                    }
                     className="w-24"
                   />
                   <span className="text-sm text-muted-foreground">minutes</span>
                 </div>
-                <p className="text-sm text-muted-foreground">Duration of focused work sessions (default: 25 minutes)</p>
+                <p className="text-sm text-muted-foreground">
+                  Duration of focused work sessions (default: 25 minutes)
+                </p>
               </div>
 
               <Separator />
 
+              {/* Cycle Length */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label
+                    htmlFor="cycle-length"
+                    className="text-base font-medium"
+                  >
+                    Pomodoros per cycle
+                  </Label>
+                  <Badge variant="outline">{settings.cycleLength ?? 4}</Badge>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Input
+                    id="cycle-length"
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={settings.cycleLength ?? 4}
+                    onChange={(e) => handleCycleLengthChange(e.target.value)}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    pomodoros
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Number of pomodoros in a cycle before a long break (default:
+                  4)
+                </p>
+              </div>
+
               {/* Short Break Duration */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="short-break-duration" className="text-base font-medium">
+                  <Label
+                    htmlFor="short-break-duration"
+                    className="text-base font-medium"
+                  >
                     Short Break Duration
                   </Label>
-                  <Badge variant="outline">{formatDuration(settings.shortBreakDuration)}</Badge>
+                  <Badge variant="outline">
+                    {formatDuration(settings.shortBreakDuration)}
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-4">
                   <Input
@@ -139,13 +228,16 @@ export default function SettingsPage() {
                     min="1"
                     max="60"
                     value={settings.shortBreakDuration}
-                    onChange={(e) => handleDurationChange("shortBreakDuration", e.target.value)}
+                    onChange={(e) =>
+                      handleDurationChange("shortBreakDuration", e.target.value)
+                    }
                     className="w-24"
                   />
                   <span className="text-sm text-muted-foreground">minutes</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Duration of short breaks between pomodoros (default: 5 minutes)
+                  Duration of short breaks between pomodoros (default: 5
+                  minutes)
                 </p>
               </div>
 
@@ -154,10 +246,15 @@ export default function SettingsPage() {
               {/* Long Break Duration */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="long-break-duration" className="text-base font-medium">
+                  <Label
+                    htmlFor="long-break-duration"
+                    className="text-base font-medium"
+                  >
                     Long Break Duration
                   </Label>
-                  <Badge variant="outline">{formatDuration(settings.longBreakDuration)}</Badge>
+                  <Badge variant="outline">
+                    {formatDuration(settings.longBreakDuration)}
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-4">
                   <Input
@@ -166,13 +263,16 @@ export default function SettingsPage() {
                     min="1"
                     max="120"
                     value={settings.longBreakDuration}
-                    onChange={(e) => handleDurationChange("longBreakDuration", e.target.value)}
+                    onChange={(e) =>
+                      handleDurationChange("longBreakDuration", e.target.value)
+                    }
                     className="w-24"
                   />
                   <span className="text-sm text-muted-foreground">minutes</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Duration of long breaks after 4 pomodoros (default: 15 minutes)
+                  Duration of long breaks after 4 pomodoros (default: 15
+                  minutes)
                 </p>
               </div>
             </CardContent>
@@ -190,7 +290,10 @@ export default function SettingsPage() {
               {/* Auto Start Breaks */}
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label htmlFor="auto-start-breaks" className="text-base font-medium">
+                  <Label
+                    htmlFor="auto-start-breaks"
+                    className="text-base font-medium"
+                  >
                     Auto-start Breaks
                   </Label>
                   <p className="text-sm text-muted-foreground">
@@ -200,7 +303,9 @@ export default function SettingsPage() {
                 <Switch
                   id="auto-start-breaks"
                   checked={settings.autoStartBreaks}
-                  onCheckedChange={(checked) => updateSetting("autoStartBreaks", checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("autoStartBreaks", checked)
+                  }
                 />
               </div>
 
@@ -209,15 +314,22 @@ export default function SettingsPage() {
               {/* Auto Start Pomodoros */}
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label htmlFor="auto-start-pomodoros" className="text-base font-medium">
+                  <Label
+                    htmlFor="auto-start-pomodoros"
+                    className="text-base font-medium"
+                  >
                     Auto-start Pomodoros
                   </Label>
-                  <p className="text-sm text-muted-foreground">Automatically start work sessions when breaks end</p>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically start work sessions when breaks end
+                  </p>
                 </div>
                 <Switch
                   id="auto-start-pomodoros"
                   checked={settings.autoStartPomodoros}
-                  onCheckedChange={(checked) => updateSetting("autoStartPomodoros", checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("autoStartPomodoros", checked)
+                  }
                 />
               </div>
 
@@ -226,17 +338,23 @@ export default function SettingsPage() {
               {/* Auto Check Completed Tasks */}
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <Label htmlFor="auto-check-completed" className="text-base font-medium">
+                  <Label
+                    htmlFor="auto-check-completed"
+                    className="text-base font-medium"
+                  >
                     Auto-check Completed Tasks
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically mark tasks as completed when all pomodoros are finished
+                    Automatically mark tasks as completed when all pomodoros are
+                    finished
                   </p>
                 </div>
                 <Switch
                   id="auto-check-completed"
                   checked={settings.autoCheckCompletedTasks}
-                  onCheckedChange={(checked) => updateSetting("autoCheckCompletedTasks", checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("autoCheckCompletedTasks", checked)
+                  }
                 />
               </div>
             </CardContent>
@@ -253,19 +371,25 @@ export default function SettingsPage() {
                   <div className="text-2xl font-mono font-bold text-primary">
                     {String(settings.workDuration).padStart(2, "0")}:00
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">Focus Time</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Focus Time
+                  </div>
                 </div>
                 <div className="text-center p-4 border rounded-lg">
                   <div className="text-2xl font-mono font-bold text-chart-2">
                     {String(settings.shortBreakDuration).padStart(2, "0")}:00
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">Short Break</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Short Break
+                  </div>
                 </div>
                 <div className="text-center p-4 border rounded-lg">
                   <div className="text-2xl font-mono font-bold text-chart-3">
                     {String(settings.longBreakDuration).padStart(2, "0")}:00
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">Long Break</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Long Break
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -282,9 +406,12 @@ export default function SettingsPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <p className="text-base font-medium">Reset to Default Values</p>
+                  <p className="text-base font-medium">
+                    Reset to Default Values
+                  </p>
                   <p className="text-sm text-muted-foreground">
-                    This will reset all settings to their original values (25/5/15 minutes)
+                    This will reset all settings to their original values
+                    (25/5/15 minutes)
                   </p>
                 </div>
                 <Button variant="outline" onClick={resetToDefaults}>
@@ -297,7 +424,11 @@ export default function SettingsPage() {
           {/* Save Button */}
           {hasChanges && (
             <div className="flex justify-center pt-4">
-              <Button onClick={saveSettings} size="lg" className="w-full md:w-auto">
+              <Button
+                onClick={saveSettings}
+                size="lg"
+                className="w-full md:w-auto"
+              >
                 Save Settings
               </Button>
             </div>
@@ -305,5 +436,5 @@ export default function SettingsPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }
