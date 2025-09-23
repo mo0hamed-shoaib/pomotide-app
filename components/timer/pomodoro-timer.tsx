@@ -3,7 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Play,
+  Pause,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type TimerState = "work" | "short_break" | "long_break";
@@ -269,6 +275,15 @@ export function PomodoroTimer({
     }
   };
 
+  const resetCurrentTimer = () => {
+    // Reset only the current timer's remaining time and stop it; keep session totals
+    setRemainingTimes((prev) => ({
+      ...prev,
+      [timerState]: getDuration(timerState),
+    }));
+    setTimerStatus("idle");
+  };
+
   const navigateTimer = (direction: "prev" | "next") => {
     const states: TimerState[] = ["work", "short_break", "long_break"];
     const currentIndex = states.indexOf(timerState);
@@ -342,11 +357,9 @@ export function PomodoroTimer({
 
   useEffect(() => {
     if (externalState && externalState !== timerState) {
-      if (externalStateSource === "tab") {
-        // Tab navigation requires manual start
-        switchTimerState(externalState, false);
-      } else if (externalStateSource === "arrow") {
-        // Arrow navigation auto-starts
+      // Treat tab navigation the same as arrow navigation (auto-start) to keep
+      // behavior consistent across controls.
+      if (externalStateSource === "tab" || externalStateSource === "arrow") {
         switchTimerState(externalState, true);
       } else {
         // Default behavior (manual start)
@@ -474,6 +487,20 @@ export function PomodoroTimer({
                     : "Ready"}
                 </div>
               </div>
+
+              {/* Reset button is positioned absolutely so it doesn't affect vertical centering */}
+              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={resetCurrentTimer}
+                  aria-label="Reset timer"
+                  className="h-7 w-7"
+                  title="Reset timer"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -537,7 +564,9 @@ export function PomodoroTimer({
                   return;
                 }
 
-                // Confirmed: perform reset
+                // Confirmed: perform reset (session-level only)
+                // Reset session focus totals and persisted keys, but do NOT touch the
+                // running timer or its remaining time.
                 setSessionFocusSeconds(0);
 
                 try {
@@ -546,13 +575,6 @@ export function PomodoroTimer({
                   localStorage.removeItem(SESSION_FOCUS_KEY);
                 } catch {}
                 setCompletedPomodoros(0);
-
-                setTimerStatus("idle");
-                setRemainingTimes(() => ({
-                  work: getDuration("work"),
-                  short_break: getDuration("short_break"),
-                  long_break: getDuration("long_break"),
-                }));
 
                 try {
                   const { toast } = await import("sonner");
