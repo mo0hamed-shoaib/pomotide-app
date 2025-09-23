@@ -1,22 +1,25 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus } from "lucide-react"
-import { TaskCard, type Task } from "./task-card"
-import { TaskForm } from "./task-form"
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus } from "lucide-react";
+import { TaskCard, type Task } from "./task-card";
+export type { Task };
+import { TaskForm } from "./task-form";
 
 interface TaskListProps {
-  tasks: Task[]
-  activeTaskId?: string
-  timerState?: "work" | "short_break" | "long_break"
-  onTaskSelect: (task: Task) => void
-  onTaskAdd: (task: Omit<Task, "id" | "createdAt" | "completedPomodoros" | "status">) => void
-  onTaskEdit: (taskId: string, updates: Partial<Task>) => void
-  onTaskDelete: (taskId: string) => void
-  onTaskDuplicate: (task: Task) => void
+  tasks: Task[];
+  activeTaskId?: string;
+  timerState?: "work" | "short_break" | "long_break";
+  onTaskSelect: (task: Task) => void;
+  onTaskAdd: (
+    task: Omit<Task, "id" | "createdAt" | "completedPomodoros" | "status">
+  ) => void;
+  onTaskEdit: (taskId: string, updates: Partial<Task>) => void;
+  onTaskDelete: (taskId: string) => void;
+  onTaskDuplicate: (task: Task) => void;
 }
 
 export function TaskList({
@@ -29,34 +32,42 @@ export function TaskList({
   onTaskDelete,
   onTaskDuplicate,
 }: TaskListProps) {
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  const handleAddTask = (taskData: { title: string; description: string; estimatedPomodoros: number }) => {
-    onTaskAdd(taskData)
-    setShowAddForm(false)
-  }
+  const handleAddTask = (taskData: {
+    title: string;
+    description: string;
+    estimatedPomodoros: number;
+  }) => {
+    onTaskAdd(taskData);
+    setShowAddForm(false);
+  };
 
-  const handleEditTask = (taskData: { title: string; description: string; estimatedPomodoros: number }) => {
+  const handleEditTask = (taskData: {
+    title: string;
+    description: string;
+    estimatedPomodoros: number;
+  }) => {
     if (editingTask) {
-      onTaskEdit(editingTask.id, taskData)
-      setEditingTask(null)
+      onTaskEdit(editingTask.id, taskData);
+      setEditingTask(null);
     }
-  }
+  };
 
   const handleDuplicateTask = (task: Task) => {
     onTaskAdd({
       title: `${task.title} (Copy)`,
       description: task.description,
       estimatedPomodoros: task.estimatedPomodoros,
-    })
-  }
+    });
+  };
 
   const sortedTasks = [...tasks].sort((a, b) => {
-    if (a.status === "completed" && b.status !== "completed") return 1
-    if (b.status === "completed" && a.status !== "completed") return -1
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  })
+    if (a.status === "completed" && b.status !== "completed") return 1;
+    if (b.status === "completed" && a.status !== "completed") return -1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   return (
     <Card className="h-full flex flex-col">
@@ -79,7 +90,12 @@ export function TaskList({
         <ScrollArea className="flex-1 px-6 custom-scrollbar">
           <div className="space-y-3 pb-6">
             {/* Add Task Form */}
-            {showAddForm && <TaskForm onSubmit={handleAddTask} onCancel={() => setShowAddForm(false)} />}
+            {showAddForm && (
+              <TaskForm
+                onSubmit={handleAddTask}
+                onCancel={() => setShowAddForm(false)}
+              />
+            )}
 
             {/* Task Cards */}
             {sortedTasks.map((task) => (
@@ -118,5 +134,5 @@ export function TaskList({
         </ScrollArea>
       </CardContent>
     </Card>
-  )
+  );
 }
