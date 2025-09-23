@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/lib/hooks/use-auth";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const geistSans = Inter({
@@ -16,7 +17,7 @@ const geistMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pomodoro Focus",
+  title: "Pomotide",
   description: "A harmonious Pomodoro timer for focused productivity",
   generator: "v0.app",
 };
@@ -40,6 +41,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>{children}</AuthProvider>
+          <Toaster richColors position="bottom-center" />
         </ThemeProvider>
       </body>
     </html>
