@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
@@ -25,6 +25,7 @@ interface PomodoroTimerProps {
   } | null;
   externalState?: TimerState;
   externalStateSource?: "tab" | "arrow"; // Added to differentiate between tab and arrow navigation
+  cycleLength?: number;
 }
 
 export function PomodoroTimer({
@@ -38,6 +39,7 @@ export function PomodoroTimer({
   currentTask,
   externalState,
   externalStateSource,
+  cycleLength,
 }: PomodoroTimerProps) {
   const [timerState, setTimerState] = useState<TimerState>("work");
   const [timerStatus, setTimerStatus] = useState<TimerStatus>("idle");
@@ -51,7 +53,122 @@ export function PomodoroTimer({
   });
 
   const [completedPomodoros, setCompletedPomodoros] = useState(0);
-  const [sessionFocusSeconds, setSessionFocusSeconds] = useState(0);
+  const LOCAL_COMPLETED_KEY = "pomotide_completedPomodoros";
+  const SESSION_FOCUS_KEY = "pomotide_sessionFocusSeconds";
+
+  // Read persisted session focus synchronously on first render so a reload
+  // doesn't start the UI at 0 before effects run.
+  const getInitialSessionFocus = () => {
+    try {
+      const raw = localStorage.getItem(SESSION_FOCUS_KEY);
+      if (raw) {
+        const parsed = parseInt(raw, 10);
+        if (!Number.isNaN(parsed)) return parsed;
+      }
+    } catch {}
+    return 0;
+  };
+
+  const [sessionFocusSeconds, setSessionFocusSeconds] = useState<number>(() =>
+    getInitialSessionFocus()
+  );
+  const sessionFocusRef = useRef<number>(sessionFocusSeconds);
+  // Throttling helpers for persistence: write at most once every 5s
+  const lastPersistRef = useRef<number>(Date.now());
+  const persistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const cycleLengthNormalized = Math.max(1, Math.floor(cycleLength ?? 4));
+
+  // Load persisted local cycle count from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_COMPLETED_KEY);
+      if (raw) {
+        const parsed = parseInt(raw, 10);
+        if (!Number.isNaN(parsed)) setCompletedPomodoros(parsed);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Note: session focus is initialized synchronously from localStorage above
+  // so we don't need a separate load effect. sessionFocusRef was seeded
+  // with that initial value.
+
+  // Persist local cycle count
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_COMPLETED_KEY, String(completedPomodoros));
+    } catch {
+      // ignore
+    }
+  }, [completedPomodoros]);
+
+  // Persist session focus seconds (throttled) so a refresh won't lose the running total
+  useEffect(() => {
+    const MAX_INTERVAL = 5000; // ms
+    const now = Date.now();
+    const elapsed = now - lastPersistRef.current;
+
+    const write = () => {
+      try {
+        localStorage.setItem(SESSION_FOCUS_KEY, String(sessionFocusSeconds));
+      } catch {}
+      lastPersistRef.current = Date.now();
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+    };
+
+    if (elapsed >= MAX_INTERVAL) {
+      write();
+    } else {
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
+      persistTimeoutRef.current = setTimeout(write, MAX_INTERVAL - elapsed);
+    }
+
+    // keep ref up to date for beforeunload handler
+    sessionFocusRef.current = sessionFocusSeconds;
+
+    return () => {
+      // noop; timeout is cleared when a newer one is scheduled or on unmount below
+    };
+  }, [sessionFocusSeconds]);
+
+  // Ensure last known sessionFocusSeconds is persisted on page unload / unmount
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem(
+          SESSION_FOCUS_KEY,
+          String(sessionFocusRef.current)
+        );
+      } catch {}
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeunload", handleBeforeUnload);
+    }
+
+    return () => {
+      try {
+        localStorage.setItem(
+          SESSION_FOCUS_KEY,
+          String(sessionFocusRef.current)
+        );
+      } catch {}
+      // clear any pending scheduled persist
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+      }
+    };
+  }, []);
 
   const getDuration = useCallback(
     (state: TimerState) => {
@@ -77,6 +194,17 @@ export function PomodoroTimer({
       .padStart(2, "0")}`;
   };
 
+  const formatHMS = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    // Always render HH:MM:SS (pad hours)
+    return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(
+      2,
+      "0"
+    )}:${String(secs).padStart(2, "0")}`;
+  };
+
   const getProgress = () => {
     const totalDuration = getDuration(timerState);
     return ((totalDuration - timeLeft) / totalDuration) * 100;
@@ -88,7 +216,9 @@ export function PomodoroTimer({
     onTimerStateChange?.(newState);
   };
 
-  const handleTimerComplete = () => {
+  const completingRef = useRef(false);
+
+  const handleTimerComplete = useCallback(() => {
     const currentDuration = getDuration(timerState);
     onSessionComplete?.(timerState, Math.floor(currentDuration / 60));
 
@@ -96,14 +226,17 @@ export function PomodoroTimer({
       const newCompletedPomodoros = completedPomodoros + 1;
       setCompletedPomodoros(newCompletedPomodoros);
 
+      // Reset the work remaining time (visual)
       setRemainingTimes((prev) => ({
         ...prev,
         work: getDuration("work"),
       }));
 
-      // After 4 pomodoros, take a long break
+      // After cycleLength pomodoros, take a long break
       const nextState =
-        newCompletedPomodoros % 4 === 0 ? "long_break" : "short_break";
+        newCompletedPomodoros % cycleLengthNormalized === 0
+          ? "long_break"
+          : "short_break";
       switchTimerState(nextState, autoStartBreaks);
     } else {
       setRemainingTimes((prev) => ({
@@ -114,7 +247,19 @@ export function PomodoroTimer({
       // Break finished, back to work
       switchTimerState("work", autoStartPomodoros);
     }
-  };
+
+    // allow future completions after a short delay
+    setTimeout(() => {
+      completingRef.current = false;
+    }, 800);
+  }, [
+    timerState,
+    completedPomodoros,
+    getDuration,
+    onSessionComplete,
+    autoStartBreaks,
+    autoStartPomodoros,
+  ]);
 
   const toggleTimer = () => {
     if (timerStatus === "running") {
@@ -138,32 +283,37 @@ export function PomodoroTimer({
     switchTimerState(states[newIndex], true);
   };
 
-  // Timer countdown effect
+  // Timer countdown effect (uses timeout to avoid overlapping intervals and
+  // debounce completion so handleTimerComplete is called once per completion)
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let timer: NodeJS.Timeout | undefined;
 
-    if (timerStatus === "running" && timeLeft > 0) {
-      interval = setInterval(() => {
-        setRemainingTimes((prev) => {
-          const newTime = prev[timerState] - 1;
-          if (newTime <= 0) {
-            handleTimerComplete();
-            return prev;
-          }
-          return {
+    if (timerStatus === "running") {
+      if (timeLeft > 0) {
+        timer = setTimeout(() => {
+          setRemainingTimes((prev) => ({
             ...prev,
-            [timerState]: newTime,
-          };
-        });
-        // Increment session focus stopwatch only when in work state
-        if (timerState === "work") {
-          setSessionFocusSeconds((s) => s + 1);
+            [timerState]: prev[timerState] - 1,
+          }));
+
+          // Increment session focus stopwatch only when in work state
+          if (timerState === "work") {
+            setSessionFocusSeconds((s) => s + 1);
+          }
+        }, 1000);
+      } else {
+        // timeLeft is 0 or less -> complete the timer once
+        if (!completingRef.current) {
+          completingRef.current = true;
+          handleTimerComplete();
         }
-      }, 1000);
+      }
     }
 
-    return () => clearInterval(interval);
-  }, [timerStatus, timeLeft, timerState]);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [timerStatus, timeLeft, timerState, handleTimerComplete]);
 
   useEffect(() => {
     setRemainingTimes((prev) => ({
@@ -367,42 +517,93 @@ export function PomodoroTimer({
           <div className="flex items-center gap-3 mt-3">
             <div className="text-sm text-muted-foreground">Session Focus:</div>
             <div className="font-mono font-medium tabular-nums">
-              {Math.floor(sessionFocusSeconds / 60)}:
-              {String(sessionFocusSeconds % 60).padStart(2, "0")}
+              {formatHMS(sessionFocusSeconds)}
             </div>
             <Button
-              variant="ghost"
+              variant={resetConfirm ? "destructive" : "ghost"}
               size="sm"
-              onClick={() => setSessionFocusSeconds(0)}
+              onClick={async () => {
+                if (!resetConfirm) {
+                  // First click: flip to confirm state
+                  setResetConfirm(true);
+                  try {
+                    const { toast } = await import("sonner");
+                    toast(`Click again to confirm reset`, {
+                      id: "reset-confirm",
+                    });
+                  } catch {}
+                  // Auto clear confirmation after 4 seconds
+                  setTimeout(() => setResetConfirm(false), 4000);
+                  return;
+                }
+
+                // Confirmed: perform reset
+                setSessionFocusSeconds(0);
+
+                try {
+                  console.debug("[pomodoro] reset: removing persisted keys");
+                  localStorage.removeItem(LOCAL_COMPLETED_KEY);
+                  localStorage.removeItem(SESSION_FOCUS_KEY);
+                } catch {}
+                setCompletedPomodoros(0);
+
+                setTimerStatus("idle");
+                setRemainingTimes(() => ({
+                  work: getDuration("work"),
+                  short_break: getDuration("short_break"),
+                  long_break: getDuration("long_break"),
+                }));
+
+                try {
+                  const { toast } = await import("sonner");
+                  toast.success("Session reset");
+                } catch {}
+
+                setResetConfirm(false);
+              }}
             >
-              Reset
+              {resetConfirm ? "Confirm" : "Reset"}
             </Button>
           </div>
 
-          {/* Pomodoro Progress */}
-          <div className="flex items-center gap-2">
-            {Array.from({ length: 4 }, (_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "w-3 h-3 rounded-full border-2",
-                  i < completedPomodoros % 4
-                    ? "bg-primary border-primary"
-                    : "border-muted-foreground"
-                )}
-              />
-            ))}
-            <span className="text-sm text-muted-foreground ml-2">
-              {completedPomodoros} completed
-            </span>
+          {/* Pomodoro Progress: cycle dots + task progress */}
+          <div
+            className="flex flex-col sm:flex-row items-start sm:items-center gap-3"
+            title={`Dots show progress in the current ${cycleLengthNormalized}-pomodoro cycle. Cycle persists across reloads in this browser.`}
+          >
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-muted-foreground">
+                Cycle: {completedPomodoros % cycleLengthNormalized}/
+                {cycleLengthNormalized}
+              </div>
+              <div className="flex items-center gap-2 ml-2">
+                {Array.from({ length: cycleLengthNormalized }, (_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "w-3 h-3 rounded-full border-2",
+                      i < completedPomodoros % cycleLengthNormalized
+                        ? "bg-primary border-primary"
+                        : "border-muted-foreground"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="text-sm text-muted-foreground w-full sm:w-auto mt-2 sm:mt-0">
+              {currentTask ? (
+                <span>
+                  Task: {currentTask.completedPomodoros}/
+                  {currentTask.estimatedPomodoros}
+                </span>
+              ) : (
+                <span>Session: {completedPomodoros} completed</span>
+              )}
+            </div>
           </div>
 
-          {/* No Task Warning */}
-          {!currentTask && timerState === "work" && (
-            <div className="text-center text-sm text-muted-foreground">
-              Add a task to start your focus session
-            </div>
-          )}
+          {/* No Task Warning removed as requested */}
         </div>
       </div>
     </div>
