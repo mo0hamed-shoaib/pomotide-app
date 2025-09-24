@@ -21,6 +21,11 @@ export const metadata: Metadata = {
   title: "Pomotide",
   description: "A harmonious Pomodoro timer for focused productivity",
   generator: "v0.app",
+  icons: {
+    icon: "/pomotide-logo.png",
+    shortcut: "/pomotide-logo.png",
+    apple: "/pomotide-logo.png",
+  },
 };
 
 export default function RootLayout({

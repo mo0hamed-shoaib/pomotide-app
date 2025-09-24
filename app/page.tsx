@@ -27,6 +27,8 @@ import {
   LogIn,
   LogOut,
   User,
+  Github,
+  Linkedin,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/hooks/use-auth";
@@ -186,7 +188,12 @@ export default function HomePage() {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/pomotide-logo.png" 
+                alt="Pomotide Logo" 
+                className="h-8 w-8"
+              />
               <h1 className="text-2xl font-bold">Pomotide</h1>
             </div>
 
@@ -367,6 +374,31 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-card mt-auto">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+            <a 
+              href={process.env.NEXT_PUBLIC_GITHUB_URL} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+            <a 
+              href={process.env.NEXT_PUBLIC_LINKEDIN_URL} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
+              <Linkedin className="h-4 w-4" />
+            </a>
+            <span>Pomotide by Jimmy</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
