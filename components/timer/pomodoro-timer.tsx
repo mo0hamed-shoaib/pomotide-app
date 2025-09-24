@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,6 +11,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { audioManager, type SoundType } from "@/lib/audio/sounds";
 
 export type TimerState = "work" | "short_break" | "long_break";
 export type TimerStatus = "idle" | "running" | "paused";
@@ -22,6 +23,9 @@ interface PomodoroTimerProps {
   autoStartBreaks?: boolean;
   autoStartPomodoros?: boolean;
   onSessionComplete?: (type: TimerState, duration: number) => void;
+  autoStartOnNavigation?: boolean;
+  notificationsEnabled?: boolean;
+  soundEnabled?: boolean;
   onTimerStateChange?: (state: TimerState) => void;
   currentTask?: {
     id: string;
@@ -40,6 +44,9 @@ export function PomodoroTimer({
   longBreakDuration = 15,
   autoStartBreaks = true,
   autoStartPomodoros = true,
+  autoStartOnNavigation = true,
+  notificationsEnabled = false,
+  soundEnabled = false,
   onSessionComplete,
   onTimerStateChange,
   currentTask,
@@ -47,20 +54,108 @@ export function PomodoroTimer({
   externalStateSource,
   cycleLength,
 }: PomodoroTimerProps) {
-  const [timerState, setTimerState] = useState<TimerState>("work");
-  const [timerStatus, setTimerStatus] = useState<TimerStatus>("idle");
+  // Synchronously initialize from snapshot if available to avoid any reset/flicker
+  const initialFromSnapshot = (() => {
+    if (typeof window === "undefined") {
+      return {
+        timerState: "work" as TimerState,
+        timerStatus: "idle" as TimerStatus,
+        remainingTimes: {
+          work: workDuration * 60,
+          short_break: shortBreakDuration * 60,
+          long_break: longBreakDuration * 60,
+        } as Record<TimerState, number>,
+      };
+    }
+    try {
+      const raw = localStorage.getItem("pomotide_running_snapshot");
+      if (!raw) {
+        return {
+          timerState: "work" as TimerState,
+          timerStatus: "idle" as TimerStatus,
+          remainingTimes: {
+            work: workDuration * 60,
+            short_break: shortBreakDuration * 60,
+            long_break: longBreakDuration * 60,
+          } as Record<TimerState, number>,
+        };
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.timestamp || !parsed.remainingTimes) {
+        throw new Error("invalid snapshot");
+      }
+      const pickNumber = (v: any): number | undefined => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      };
+
+      const restored: Record<TimerState, number> = {
+        work:
+          pickNumber(
+            parsed.remainingTimes.work ??
+              parsed.remainingTimes.workSeconds ??
+              parsed.remainingTimes.work_sec
+          ) ?? workDuration * 60,
+        short_break:
+          pickNumber(
+            parsed.remainingTimes.short_break ??
+              parsed.remainingTimes.shortBreak ??
+              parsed.remainingTimes.short_break_seconds
+          ) ?? shortBreakDuration * 60,
+        long_break:
+          pickNumber(
+            parsed.remainingTimes.long_break ??
+              parsed.remainingTimes.longBreak ??
+              parsed.remainingTimes.long_break_seconds
+          ) ?? longBreakDuration * 60,
+      };
+
+      const parsedState = (parsed.timerState as TimerState) ?? "work";
+      const wasRunning = parsed.timerStatus === "running";
+      const elapsedSec = Math.floor((Date.now() - parsed.timestamp) / 1000);
+      const adjusted = { ...restored } as Record<TimerState, number>;
+      adjusted[parsedState] = Math.max(
+        0,
+        restored[parsedState] - (wasRunning ? elapsedSec : 0)
+      );
+
+      const status: TimerStatus = adjusted[parsedState] > 0
+        ? (wasRunning ? "running" : "paused")
+        : "idle";
+
+      return {
+        timerState: parsedState,
+        timerStatus: status,
+        remainingTimes: adjusted,
+      };
+    } catch {
+      return {
+        timerState: "work" as TimerState,
+        timerStatus: "idle" as TimerStatus,
+        remainingTimes: {
+          work: workDuration * 60,
+          short_break: shortBreakDuration * 60,
+          long_break: longBreakDuration * 60,
+        } as Record<TimerState, number>,
+      };
+    }
+  })();
+
+  const [timerState, setTimerState] = useState<TimerState>(
+    initialFromSnapshot.timerState
+  );
+  const [timerStatus, setTimerStatus] = useState<TimerStatus>(
+    initialFromSnapshot.timerStatus
+  );
 
   const [remainingTimes, setRemainingTimes] = useState<
     Record<TimerState, number>
-  >({
-    work: workDuration * 60,
-    short_break: shortBreakDuration * 60,
-    long_break: longBreakDuration * 60,
-  });
+  >(initialFromSnapshot.remainingTimes);
 
   const [completedPomodoros, setCompletedPomodoros] = useState(0);
   const LOCAL_COMPLETED_KEY = "pomotide_completedPomodoros";
   const SESSION_FOCUS_KEY = "pomotide_sessionFocusSeconds";
+  const RUNNING_SNAPSHOT_KEY = "pomotide_running_snapshot";
 
   // Read persisted session focus synchronously on first render so a reload
   // doesn't start the UI at 0 before effects run.
@@ -143,7 +238,112 @@ export function PomodoroTimer({
     };
   }, [sessionFocusSeconds]);
 
-  // Ensure last known sessionFocusSeconds is persisted on page unload / unmount
+  // Persist running timer snapshot when status/state changes so we can restore
+  const initialLoadRef = useRef(true);
+
+  useEffect(() => {
+    try {
+      // Persist snapshot for running/paused; for idle we keep the last snapshot so reloads can restore.
+      if (timerStatus === "running" || timerStatus === "paused") {
+        const snapshot = {
+          timerState,
+          timerStatus,
+          remainingTimes,
+          timestamp: Date.now(),
+        };
+        try {
+          const json = JSON.stringify(snapshot);
+          localStorage.setItem(RUNNING_SNAPSHOT_KEY, json);
+        } catch (err) {
+        }
+      }
+    } catch {}
+  }, [timerState, timerStatus, remainingTimes]);
+
+  // Restore running timer snapshot on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RUNNING_SNAPSHOT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.timestamp && parsed.remainingTimes) {
+          // compute elapsed time since snapshot (seconds)
+          const elapsedSec = Math.floor((Date.now() - parsed.timestamp) / 1000);
+
+          // Defensive: accept multiple possible key shapes but DO NOT fallback
+          // to full durations on restore; if a key is missing, keep current state.
+          const pickNumber = (v: any): number | undefined => {
+            const n = Number(v);
+            return Number.isFinite(n) ? n : undefined;
+          };
+
+          const restored: Record<TimerState, number> = {
+            work:
+              pickNumber(
+                parsed.remainingTimes.work ??
+                  parsed.remainingTimes.workSeconds ??
+                  parsed.remainingTimes.work_sec
+              ) ?? remainingTimes.work,
+            short_break:
+              pickNumber(
+                parsed.remainingTimes.short_break ??
+                  parsed.remainingTimes.shortBreak ??
+                  parsed.remainingTimes.short_break_seconds
+              ) ?? remainingTimes.short_break,
+            long_break:
+              pickNumber(
+                parsed.remainingTimes.long_break ??
+                  parsed.remainingTimes.longBreak ??
+                  parsed.remainingTimes.long_break_seconds
+              ) ?? remainingTimes.long_break,
+          };
+
+          const parsedState = (parsed.timerState as TimerState) ?? "work";
+
+          // Only subtract elapsed if the snapshot was running; if it was paused, keep the paused remaining time
+          const wasRunning = parsed.timerStatus === "running";
+          const newRemaining = Math.max(
+            0,
+            restored[parsedState] - (wasRunning ? elapsedSec : 0)
+          );
+          restored[parsedState] = newRemaining;
+
+          setRemainingTimes((prev) => ({ ...prev, ...restored }));
+          
+
+          // Persist a normalized snapshot immediately so we don't get an
+          // intermediate write that contains stale default durations.
+          try {
+            const normalized = {
+              timerState: parsedState,
+              timerStatus: wasRunning ? ("running" as const) : ("paused" as const),
+              remainingTimes: restored,
+              timestamp: Date.now(),
+            };
+            const njson = JSON.stringify(normalized);
+            localStorage.setItem(RUNNING_SNAPSHOT_KEY, njson);
+          } catch (err) {
+            
+          }
+
+          // restore state/status but if it reached zero, treat as idle and let completion flow run
+          if (newRemaining > 0) {
+            setTimerState(parsedState);
+            setTimerStatus(wasRunning ? "running" : "paused");
+          } else {
+            // remove stale snapshot
+            localStorage.removeItem(RUNNING_SNAPSHOT_KEY);
+          }
+          // mark restore attempt complete so persist effect can clear stale snapshots
+          initialLoadRef.current = false;
+        }
+      }
+    } catch {}
+    // Ensure we always clear initial load flag even if there was no snapshot
+    initialLoadRef.current = false;
+  }, []);
+
+  // Handle browser sleep/wake cycles and visibility changes
   useEffect(() => {
     const handleBeforeUnload = () => {
       try {
@@ -154,8 +354,63 @@ export function PomodoroTimer({
       } catch {}
     };
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden - save current state
+        if (timerStatus === "running") {
+          try {
+            const snapshot = {
+              timerState,
+              timerStatus: "running" as const,
+              remainingTimes,
+              timestamp: Date.now(),
+            };
+            const json = JSON.stringify(snapshot);
+            localStorage.setItem(RUNNING_SNAPSHOT_KEY, json);
+          } catch {}
+        }
+      } else {
+        // Page is visible again - check if we need to adjust time
+        if (timerStatus === "running") {
+          try {
+            const raw = localStorage.getItem(RUNNING_SNAPSHOT_KEY);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && parsed.timestamp && parsed.remainingTimes) {
+                const elapsedSec = Math.floor((Date.now() - parsed.timestamp) / 1000);
+                if (elapsedSec > 0) {
+                  // Adjust remaining time based on elapsed time while hidden
+                  setRemainingTimes((prev) => {
+                    const adjusted = { ...prev };
+                    const currentRemaining = prev[timerState];
+                    const newRemaining = Math.max(0, currentRemaining - elapsedSec);
+                    adjusted[timerState] = newRemaining;
+                    
+                    // Update snapshot with adjusted time
+                    try {
+                      const updatedSnapshot = {
+                        timerState,
+                        timerStatus: "running" as const,
+                        remainingTimes: adjusted,
+                        timestamp: Date.now(),
+                      };
+                      const json = JSON.stringify(updatedSnapshot);
+                      localStorage.setItem(RUNNING_SNAPSHOT_KEY, json);
+                    } catch {}
+                    
+                    return adjusted;
+                  });
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+    };
+
     if (typeof window !== "undefined") {
       window.addEventListener("beforeunload", handleBeforeUnload);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
     }
 
     return () => {
@@ -172,9 +427,10 @@ export function PomodoroTimer({
       }
       if (typeof window !== "undefined") {
         window.removeEventListener("beforeunload", handleBeforeUnload);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
       }
     };
-  }, []);
+  }, [timerStatus, timerState, remainingTimes]);
 
   const getDuration = useCallback(
     (state: TimerState) => {
@@ -190,17 +446,24 @@ export function PomodoroTimer({
     [workDuration, shortBreakDuration, longBreakDuration]
   );
 
+  // When durations change, clear outdated snapshot so we don't restore old lengths
+  useEffect(() => {
+    try {
+      localStorage.removeItem(RUNNING_SNAPSHOT_KEY);
+    } catch {}
+  }, [workDuration, shortBreakDuration, longBreakDuration]);
+
   const timeLeft = remainingTimes[timerState];
 
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
-  };
+  }, []);
 
-  const formatHMS = (seconds: number) => {
+  const formatHMS = useCallback((seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
@@ -209,30 +472,35 @@ export function PomodoroTimer({
       2,
       "0"
     )}:${String(secs).padStart(2, "0")}`;
-  };
+  }, []);
 
-  const getProgress = () => {
+  const getProgress = useCallback(() => {
     const totalDuration = getDuration(timerState);
     return ((totalDuration - timeLeft) / totalDuration) * 100;
-  };
+  }, [getDuration, timerState, timeLeft]);
 
   const switchTimerState = (newState: TimerState, autoStart = false) => {
     setTimerState(newState);
     setTimerStatus(autoStart ? "running" : "idle");
+    // Reset completing ref when switching states to allow new completions
+    completingRef.current = false;
     onTimerStateChange?.(newState);
   };
 
   const completingRef = useRef(false);
 
-  const handleTimerComplete = useCallback(() => {
+  const handleTimerComplete = useCallback(async () => {
     const currentDuration = getDuration(timerState);
-    onSessionComplete?.(timerState, Math.floor(currentDuration / 60));
-
+    
+    // For work sessions, complete immediately and determine next state
     if (timerState === "work") {
+      // Complete the work session
       const newCompletedPomodoros = completedPomodoros + 1;
       setCompletedPomodoros(newCompletedPomodoros);
+      
+      onSessionComplete?.(timerState, Math.floor(currentDuration / 60));
 
-      // Reset the work remaining time (visual)
+      // Reset work timer
       setRemainingTimes((prev) => ({
         ...prev,
         work: getDuration("work"),
@@ -243,8 +511,24 @@ export function PomodoroTimer({
         newCompletedPomodoros % cycleLengthNormalized === 0
           ? "long_break"
           : "short_break";
+
       switchTimerState(nextState, autoStartBreaks);
-    } else {
+      
+      // Play work completion sound
+      if (soundEnabled) {
+        try {
+          await audioManager.playSound("work");
+        } catch (error) {
+          console.error("Failed to play completion sound:", error);
+        }
+      }
+      return;
+    }
+    
+    // For breaks, complete immediately and return to work
+    if (timerState === "short_break" || timerState === "long_break") {
+      onSessionComplete?.(timerState, Math.floor(currentDuration / 60));
+
       setRemainingTimes((prev) => ({
         ...prev,
         [timerState]: getDuration(timerState),
@@ -252,12 +536,38 @@ export function PomodoroTimer({
 
       // Break finished, back to work
       switchTimerState("work", autoStartPomodoros);
+      
+      // Play break completion sound
+      if (soundEnabled) {
+        try {
+          const soundType = timerState === "short_break" ? "shortBreak" : "longBreak";
+          await audioManager.playSound(soundType);
+        } catch (error) {
+          console.error("Failed to play completion sound:", error);
+        }
+      }
     }
 
     // allow future completions after a short delay
     setTimeout(() => {
       completingRef.current = false;
     }, 800);
+
+    // Notify the user via the Notification API (if enabled)
+    try {
+      if (
+        notificationsEnabled &&
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        const title = "Session Complete";
+        const body = "Session finished — time for a break or to continue";
+        try {
+          new Notification(title, { body });
+        } catch {}
+      }
+    } catch {}
   }, [
     timerState,
     completedPomodoros,
@@ -267,12 +577,22 @@ export function PomodoroTimer({
     autoStartPomodoros,
   ]);
 
+
   const toggleTimer = () => {
-    if (timerStatus === "running") {
-      setTimerStatus("paused");
-    } else {
-      setTimerStatus("running");
-    }
+    const nextStatus: TimerStatus =
+      timerStatus === "running" ? "paused" : "running";
+    setTimerStatus(nextStatus);
+    // Persist immediately on user action to guarantee key exists
+    try {
+            const snapshot = {
+              timerState,
+              timerStatus: nextStatus,
+              remainingTimes,
+              timestamp: Date.now(),
+            };
+      const json = JSON.stringify(snapshot);
+      localStorage.setItem(RUNNING_SNAPSHOT_KEY, json);
+    } catch {}
   };
 
   const resetCurrentTimer = () => {
@@ -282,6 +602,12 @@ export function PomodoroTimer({
       [timerState]: getDuration(timerState),
     }));
     setTimerStatus("idle");
+    (async () => {
+      try {
+        const { toast } = await import("sonner");
+        toast("Timer reset");
+      } catch {}
+    })();
   };
 
   const navigateTimer = (direction: "prev" | "next") => {
@@ -306,10 +632,22 @@ export function PomodoroTimer({
     if (timerStatus === "running") {
       if (timeLeft > 0) {
         timer = setTimeout(() => {
-          setRemainingTimes((prev) => ({
-            ...prev,
-            [timerState]: prev[timerState] - 1,
-          }));
+          setRemainingTimes((prev) => {
+            const next = { ...prev, [timerState]: prev[timerState] - 1 };
+            // also persist immediately so reloads always find a snapshot
+            try {
+            const snapshot = {
+              timerState,
+              timerStatus: "running" as const,
+              remainingTimes: next,
+              timestamp: Date.now(),
+            };
+              const json = JSON.stringify(snapshot);
+              localStorage.setItem(RUNNING_SNAPSHOT_KEY, json);
+            } catch (err) {}
+
+            return next;
+          });
 
           // Increment session focus stopwatch only when in work state
           if (timerState === "work") {
@@ -331,20 +669,30 @@ export function PomodoroTimer({
   }, [timerStatus, timeLeft, timerState, handleTimerComplete]);
 
   useEffect(() => {
+    // Skip the initial mount so we don't overwrite a restored snapshot's remaining times.
+    if (initialLoadRef.current) {
+      return;
+    }
+
+    // If user changed settings, reflect new durations:
+    // - Update non-active states to new durations
+    // - For the active state, only update if idle
     setRemainingTimes((prev) => ({
       ...prev,
       work:
-        timerStatus === "idle" && timerState === "work"
-          ? getDuration("work")
-          : prev.work,
+        timerState === "work"
+          ? (timerStatus === "idle" ? getDuration("work") : prev.work)
+          : getDuration("work"),
       short_break:
-        timerStatus === "idle" && timerState === "short_break"
-          ? getDuration("short_break")
-          : prev.short_break,
+        timerState === "short_break"
+          ? (timerStatus === "idle"
+              ? getDuration("short_break")
+              : prev.short_break)
+          : getDuration("short_break"),
       long_break:
-        timerStatus === "idle" && timerState === "long_break"
-          ? getDuration("long_break")
-          : prev.long_break,
+        timerState === "long_break"
+          ? (timerStatus === "idle" ? getDuration("long_break") : prev.long_break)
+          : getDuration("long_break"),
     }));
   }, [
     workDuration,
@@ -366,9 +714,9 @@ export function PomodoroTimer({
         switchTimerState(externalState, false);
       }
     }
-  }, [externalState, externalStateSource]);
+  }, [externalState, externalStateSource, timerState, switchTimerState]);
 
-  const getStateLabel = () => {
+  const getStateLabel = useCallback(() => {
     switch (timerState) {
       case "work":
         return "Focus Time";
@@ -377,9 +725,9 @@ export function PomodoroTimer({
       case "long_break":
         return "Long Break";
     }
-  };
+  }, [timerState]);
 
-  const getStateColor = () => {
+  const getStateColor = useCallback(() => {
     switch (timerState) {
       case "work":
         return "bg-red-500 text-white";
@@ -388,9 +736,9 @@ export function PomodoroTimer({
       case "long_break":
         return "bg-blue-500 text-white";
     }
-  };
+  }, [timerState]);
 
-  const getTimerColors = () => {
+  const getTimerColors = useCallback(() => {
     switch (timerState) {
       case "work":
         return {
@@ -408,7 +756,7 @@ export function PomodoroTimer({
           button: "bg-blue-500 hover:bg-blue-600 text-white",
         };
     }
-  };
+  }, [timerState]);
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -569,12 +917,18 @@ export function PomodoroTimer({
                 // running timer or its remaining time.
                 setSessionFocusSeconds(0);
 
-                try {
-                  console.debug("[pomodoro] reset: removing persisted keys");
-                  localStorage.removeItem(LOCAL_COMPLETED_KEY);
-                  localStorage.removeItem(SESSION_FOCUS_KEY);
-                } catch {}
+            try {
+              localStorage.removeItem(LOCAL_COMPLETED_KEY);
+              localStorage.removeItem(SESSION_FOCUS_KEY);
+            } catch {}
                 setCompletedPomodoros(0);
+
+                (async () => {
+                  try {
+                    const { toast } = await import("sonner");
+                    toast.success("Session totals cleared (timer unchanged)");
+                  } catch {}
+                })();
 
                 try {
                   const { toast } = await import("sonner");
@@ -587,6 +941,8 @@ export function PomodoroTimer({
               {resetConfirm ? "Confirm" : "Reset"}
             </Button>
           </div>
+
+          
 
           {/* Pomodoro Progress: cycle dots + task progress */}
           <div
@@ -628,6 +984,7 @@ export function PomodoroTimer({
           {/* No Task Warning removed as requested */}
         </div>
       </div>
+
     </div>
   );
 }
