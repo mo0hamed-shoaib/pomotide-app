@@ -157,6 +157,8 @@ export default function HomePage() {
 
   const handleTimerStateChange = (newState: TimerState) => {
     setTimerState(newState);
+    // Reset external state source after timer completes to avoid conflicts
+    setExternalStateSource(undefined);
   };
 
   const toggleTheme = () => {
@@ -327,6 +329,9 @@ export default function HomePage() {
                     cycleLength={settings.cycleLength}
                     autoStartBreaks={settings.autoStartBreaks}
                     autoStartPomodoros={settings.autoStartPomodoros}
+                    autoStartOnNavigation={settings.autoStartOnNavigation}
+                    notificationsEnabled={settings.notificationsEnabled}
+                    soundEnabled={settings.soundEnabled}
                     onSessionComplete={handleSessionComplete}
                     onTimerStateChange={handleTimerStateChange}
                     externalState={timerState}
