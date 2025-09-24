@@ -180,40 +180,6 @@ export default function SettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Work Duration */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="work-duration"
-                    className="text-base font-medium"
-                  >
-                    Pomodoro Duration
-                  </Label>
-                  <Badge variant="outline">
-                    {formatDuration(settings.workDuration)}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Input
-                    id="work-duration"
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={settings.workDuration}
-                    onChange={(e) =>
-                      handleDurationChange("workDuration", e.target.value)
-                    }
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">minutes</span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Duration of focused work sessions (default: 25 minutes)
-                </p>
-              </div>
-
-              <Separator />
-
               {/* Cycle Length */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -244,6 +210,42 @@ export default function SettingsPage() {
                   4)
                 </p>
               </div>
+
+              <Separator />
+
+              {/* Work Duration */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label
+                    htmlFor="work-duration"
+                    className="text-base font-medium"
+                  >
+                    Focus Time Duration
+                  </Label>
+                  <Badge variant="outline">
+                    {formatDuration(settings.workDuration)}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Input
+                    id="work-duration"
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={settings.workDuration}
+                    onChange={(e) =>
+                      handleDurationChange("workDuration", e.target.value)
+                    }
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">minutes</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Duration of focused work sessions (default: 25 minutes)
+                </p>
+              </div>
+
+              <Separator />
 
               {/* Short Break Duration */}
               <div className="space-y-3">
@@ -438,13 +440,12 @@ export default function SettingsPage() {
                     request permission when enabled)
                   </p>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground">Status:</span>
                     <Badge variant={notificationsEnabled ? "default" : "secondary"}>
                       {notificationsEnabled ? "Enabled" : "Disabled"}
                     </Badge>
-                    {notifSupported !== null && (
-                      <Badge variant={notifSupported ? "outline" : "secondary"}>
-                        {notifSupported ? `Permission: ${notifPermission}` : "Not supported"}
+                    {notifSupported !== null && notifSupported && (
+                      <Badge variant="outline">
+                        {notifPermission}
                       </Badge>
                     )}
                     <Button
@@ -628,10 +629,10 @@ export default function SettingsPage() {
                 {soundEnabled && (
                   <div className="pl-4 border-l-2 border-muted">
                     <div className="space-y-2 text-sm text-muted-foreground">
-                      <p>• Work sessions: Higher pitch (A5) - 1.2s duration</p>
-                      <p>• Short breaks: Medium pitch (E5) - 0.8s duration</p>
-                      <p>• Long breaks: Lower pitch (A4) - 1.5s duration</p>
-                      <p className="text-xs">Sounds respect your system volume settings</p>
+                      <p>• Work sessions: Higher pitch (A5) - 1.2s</p>
+                      <p>• Short breaks: Medium pitch (E5) - 0.8s</p>
+                      <p>• Long breaks: Lower pitch (A4) - 1.5s</p>
+                      <p className="text-xs">Respects system volume</p>
                     </div>
                   </div>
                 )}
