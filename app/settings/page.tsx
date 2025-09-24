@@ -42,9 +42,6 @@ export default function SettingsPage() {
   } = useSettings();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [hasChanges, setHasChanges] = useState(false);
-  // Client-only notification capability state (avoids SSR hydration issues)
-  const [notifSupported, setNotifSupported] = useState<boolean | null>(null);
-  const [notifPermission, setNotifPermission] = useState<"granted" | "denied" | "default" | "n/a">("n/a");
 
   useEffect(() => {
     if (!loading && savedSettings) {
@@ -60,21 +57,6 @@ export default function SettingsPage() {
     }
   }, [loading, savedSettings]);
 
-  // Detect notification support and permission on client
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const supported = "Notification" in window;
-    setNotifSupported(supported);
-    if (supported) {
-      try {
-        setNotifPermission(Notification.permission);
-      } catch {
-        setNotifPermission("n/a");
-      }
-    } else {
-      setNotifPermission("n/a");
-    }
-  }, []);
 
   const updateSetting = <K extends keyof Settings>(
     key: K,
@@ -439,84 +421,6 @@ export default function SettingsPage() {
                     Show desktop notifications when a session completes (will
                     request permission when enabled)
                   </p>
-                  <div className="flex items-center gap-2 text-xs">
-                    <Badge variant={notificationsEnabled ? "default" : "secondary"}>
-                      {notificationsEnabled ? "Enabled" : "Disabled"}
-                    </Badge>
-                    {notifSupported !== null && notifSupported && (
-                      <Badge variant="outline">
-                        {notifPermission}
-                      </Badge>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        if (typeof window === "undefined" || !("Notification" in window)) {
-                          try {
-                            const { toast } = await import("sonner");
-                            toast.error("Notifications not supported in this browser");
-                          } catch {}
-                          return;
-                        }
-                        try {
-                          const perm = await Notification.requestPermission();
-                          setNotifPermission(perm);
-                          if (perm === "granted") {
-                            new Notification("Permission granted", { body: "Notifications are enabled." });
-                          }
-                        } catch (e) {
-                          try {
-                            const { toast } = await import("sonner");
-                            toast.error("Failed to request permission");
-                          } catch {}
-                        }
-                      }}
-                    >
-                      Re-request
-                    </Button>
-                    {notificationsEnabled && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          if (typeof window === "undefined" || !("Notification" in window)) {
-                            try {
-                              const { toast } = await import("sonner");
-                              toast.error("Notifications not supported");
-                            } catch {}
-                            return;
-                          }
-                          try {
-                            let perm = Notification.permission;
-                            if (perm !== "granted") {
-                              perm = await Notification.requestPermission();
-                            }
-                            if (perm === "granted") {
-                              new Notification("Test Notification", {
-                                body: "This is a test notification from Pomotide",
-                                icon: "/placeholder-logo.svg",
-                              });
-                            } else {
-                              try {
-                                const { toast } = await import("sonner");
-                                toast.error(`Permission is ${perm}. Allow notifications in browser settings.`);
-                              } catch {}
-                            }
-                            setNotifPermission(perm as any);
-                          } catch (err) {
-                            console.error("Test notification failed:", err);
-                            try {
-                              const { toast } = await import("sonner");
-                              toast.error("Failed to show test notification");
-                            } catch {}
-                          }
-                        }}
-                      >
-                        Test
-                      </Button>
-                    )}
-                  </div>
                 </div>
                 <Switch
                   id="notifications"
@@ -626,16 +530,6 @@ export default function SettingsPage() {
                   />
                 </div>
                 
-                {soundEnabled && (
-                  <div className="pl-4 border-l-2 border-muted">
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <p>• Work sessions: Higher pitch (A5) - 1.2s</p>
-                      <p>• Short breaks: Medium pitch (E5) - 0.8s</p>
-                      <p>• Long breaks: Lower pitch (A4) - 1.5s</p>
-                      <p className="text-xs">Respects system volume</p>
-                    </div>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
