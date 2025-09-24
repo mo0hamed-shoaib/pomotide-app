@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, Play, RotateCcw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, Clock, Play, RotateCcw, Edit3 } from "lucide-react";
 import Link from "next/link";
 
 interface Settings {
@@ -69,11 +70,39 @@ export default function SettingsPage() {
   // Notification & sound prefs (local UI state; saved via saveSettings)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  
+  // Timer edit dialog state
+  const [editingTimer, setEditingTimer] = useState<"work" | "shortBreak" | "longBreak" | null>(null);
+  const [tempDuration, setTempDuration] = useState("");
 
   const handleCycleLengthChange = (value: string) => {
     const num = Number.parseInt(value) || 1;
     const clamped = Math.max(1, Math.min(12, num));
     updateSetting("cycleLength" as keyof Settings, clamped);
+  };
+
+  const openEditDialog = (timerType: "work" | "shortBreak" | "longBreak") => {
+    setEditingTimer(timerType);
+    const currentDuration = timerType === "work" ? settings.workDuration : 
+                          timerType === "shortBreak" ? settings.shortBreakDuration : 
+                          settings.longBreakDuration;
+    setTempDuration(String(currentDuration));
+  };
+
+  const saveDuration = () => {
+    if (!editingTimer) return;
+    
+    const num = Number.parseInt(tempDuration) || 1;
+    const maxValue = editingTimer === "shortBreak" ? 60 : 120;
+    const clamped = Math.max(1, Math.min(maxValue, num));
+    
+    const key = editingTimer === "work" ? "workDuration" : 
+                editingTimer === "shortBreak" ? "shortBreakDuration" : 
+                "longBreakDuration";
+    
+    updateSetting(key as keyof Settings, clamped);
+    setEditingTimer(null);
+    setTempDuration("");
   };
 
   const handleDurationChange = (
@@ -162,6 +191,59 @@ export default function SettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Interactive Timer Preview Editor */}
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  Click on any timer to edit its duration
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Focus Time */}
+                  <div 
+                    className="text-center p-4 border-2 border-red-200 rounded-lg cursor-pointer hover:border-red-400 transition-colors group relative"
+                    onClick={() => openEditDialog("work")}
+                  >
+                    <div className="text-2xl font-mono font-bold text-red-500 group-hover:text-red-600 transition-colors">
+                      {String(settings.workDuration).padStart(2, "0")}:00
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Focus Time
+                    </div>
+                    <Edit3 className="h-4 w-4 text-muted-foreground absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+
+                  {/* Short Break */}
+                  <div 
+                    className="text-center p-4 border-2 border-green-200 rounded-lg cursor-pointer hover:border-green-400 transition-colors group relative"
+                    onClick={() => openEditDialog("shortBreak")}
+                  >
+                    <div className="text-2xl font-mono font-bold text-green-500 group-hover:text-green-600 transition-colors">
+                      {String(settings.shortBreakDuration).padStart(2, "0")}:00
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Short Break
+                    </div>
+                    <Edit3 className="h-4 w-4 text-muted-foreground absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+
+                  {/* Long Break */}
+                  <div 
+                    className="text-center p-4 border-2 border-blue-200 rounded-lg cursor-pointer hover:border-blue-400 transition-colors group relative"
+                    onClick={() => openEditDialog("longBreak")}
+                  >
+                    <div className="text-2xl font-mono font-bold text-blue-500 group-hover:text-blue-600 transition-colors">
+                      {String(settings.longBreakDuration).padStart(2, "0")}:00
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Long Break
+                    </div>
+                    <Edit3 className="h-4 w-4 text-muted-foreground absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
               {/* Cycle Length */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -190,110 +272,6 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">
                   Number of pomodoros in a cycle before a long break (default:
                   4)
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Work Duration */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="work-duration"
-                    className="text-base font-medium"
-                  >
-                    Focus Time Duration
-                  </Label>
-                  <Badge variant="outline">
-                    {formatDuration(settings.workDuration)}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Input
-                    id="work-duration"
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={settings.workDuration}
-                    onChange={(e) =>
-                      handleDurationChange("workDuration", e.target.value)
-                    }
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">minutes</span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Duration of focused work sessions (default: 25 minutes)
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Short Break Duration */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="short-break-duration"
-                    className="text-base font-medium"
-                  >
-                    Short Break Duration
-                  </Label>
-                  <Badge variant="outline">
-                    {formatDuration(settings.shortBreakDuration)}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Input
-                    id="short-break-duration"
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={settings.shortBreakDuration}
-                    onChange={(e) =>
-                      handleDurationChange("shortBreakDuration", e.target.value)
-                    }
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">minutes</span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Duration of short breaks between pomodoros (default: 5
-                  minutes)
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Long Break Duration */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="long-break-duration"
-                    className="text-base font-medium"
-                  >
-                    Long Break Duration
-                  </Label>
-                  <Badge variant="outline">
-                    {formatDuration(settings.longBreakDuration)}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Input
-                    id="long-break-duration"
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={settings.longBreakDuration}
-                    onChange={(e) =>
-                      handleDurationChange("longBreakDuration", e.target.value)
-                    }
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">minutes</span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Duration of long breaks after 4 pomodoros (default: 15
-                  minutes)
                 </p>
               </div>
             </CardContent>
@@ -534,40 +512,6 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Preview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Timer Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 border rounded-lg">
-                  <div className="text-2xl font-mono font-bold text-primary">
-                    {String(settings.workDuration).padStart(2, "0")}:00
-                  </div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Focus Time
-                  </div>
-                </div>
-                <div className="text-center p-4 border rounded-lg">
-                  <div className="text-2xl font-mono font-bold text-chart-2">
-                    {String(settings.shortBreakDuration).padStart(2, "0")}:00
-                  </div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Short Break
-                  </div>
-                </div>
-                <div className="text-center p-4 border rounded-lg">
-                  <div className="text-2xl font-mono font-bold text-chart-3">
-                    {String(settings.longBreakDuration).padStart(2, "0")}:00
-                  </div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Long Break
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Reset to Defaults */}
           <Card>
@@ -609,6 +553,45 @@ export default function SettingsPage() {
           )}
         </div>
       </main>
+
+      {/* Edit Duration Dialog */}
+      <Dialog open={editingTimer !== null} onOpenChange={() => setEditingTimer(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Edit {editingTimer === "work" ? "Focus Time" : 
+                    editingTimer === "shortBreak" ? "Short Break" : 
+                    "Long Break"} Duration
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="duration-input">Duration (minutes)</Label>
+              <Input
+                id="duration-input"
+                type="number"
+                min="1"
+                max={editingTimer === "shortBreak" ? "60" : "120"}
+                value={tempDuration}
+                onChange={(e) => setTempDuration(e.target.value)}
+                placeholder="Enter duration in minutes"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                {editingTimer === "shortBreak" ? "1-60 minutes" : "1-120 minutes"}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditingTimer(null)}>
+                Cancel
+              </Button>
+              <Button onClick={saveDuration}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
