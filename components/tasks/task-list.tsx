@@ -122,8 +122,8 @@ export function TaskList({
             {tasks.length === 0 && !showAddForm && (
               <div className="text-center py-12 text-muted-foreground">
                 <div className="space-y-2">
-                  <p>No tasks yet</p>
-                  <p className="text-sm">Add your first task to get started</p>
+                  <p className="text-lg">No tasks yet</p>
+                  <p className="text-mm">When you add a task, you can click it to start or stop working on it, and tasks do not have a mark as completed option because they are not a list of things to do, but a list of things you are doing.</p>
                 </div>
               </div>
             )}
