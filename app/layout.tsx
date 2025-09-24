@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/lib/hooks/use-auth";
+import { DataMigrationProvider } from "@/components/data-migration-provider";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -40,7 +41,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <DataMigrationProvider>
+              {children}
+            </DataMigrationProvider>
+          </AuthProvider>
           <Toaster richColors position="bottom-center" />
         </ThemeProvider>
       </body>
