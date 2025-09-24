@@ -44,6 +44,13 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!loading && savedSettings) {
       setSettings(savedSettings as Settings);
+      // Initialize notification/sound toggles from saved settings when available
+      try {
+        setNotificationsEnabled(
+          Boolean((savedSettings as Settings & { notificationsEnabled?: boolean }).notificationsEnabled)
+        );
+        setSoundEnabled(Boolean((savedSettings as Settings & { soundEnabled?: boolean }).soundEnabled));
+      } catch {}
       setHasChanges(false);
     }
   }, [loading, savedSettings]);
@@ -56,10 +63,14 @@ export default function SettingsPage() {
     setHasChanges(true);
   };
 
+  // Notification & sound prefs (local UI state; saved via saveSettings)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
   const handleCycleLengthChange = (value: string) => {
     const num = Number.parseInt(value) || 1;
     const clamped = Math.max(1, Math.min(12, num));
-    updateSetting("cycleLength" as keyof Settings, clamped as any);
+    updateSetting("cycleLength" as keyof Settings, clamped);
   };
 
   const handleDurationChange = (
@@ -88,7 +99,12 @@ export default function SettingsPage() {
 
   const saveSettings = async () => {
     try {
-      await persistSettings(settings);
+      const toSave = {
+        ...settings,
+        notificationsEnabled,
+        soundEnabled,
+      };
+      await persistSettings(toSave);
       setHasChanges(false);
       try {
         const { toast } = await import("sonner");
@@ -335,6 +351,34 @@ export default function SettingsPage() {
 
               <Separator />
 
+              {/* Auto-start on Navigation */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="auto-start-navigation"
+                    className="text-base font-medium"
+                  >
+                    Auto-start on Navigation
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically start the timer when switching modes via tabs
+                    or arrows
+                  </p>
+                </div>
+                <Switch
+                  id="auto-start-navigation"
+                  checked={Boolean((settings as Settings & { autoStartOnNavigation?: boolean }).autoStartOnNavigation)}
+                  onCheckedChange={(checked) =>
+                    updateSetting(
+                      "autoStartOnNavigation" as keyof Settings,
+                      checked
+                    )
+                  }
+                />
+              </div>
+
+              <Separator />
+
               {/* Auto Check Completed Tasks */}
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
@@ -356,6 +400,141 @@ export default function SettingsPage() {
                     updateSetting("autoCheckCompletedTasks", checked)
                   }
                 />
+              </div>
+              <Separator />
+
+              {/* Notifications */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="notifications"
+                    className="text-base font-medium"
+                  >
+                    Desktop Notifications
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Show desktop notifications when a session completes (will
+                    request permission when enabled)
+                  </p>
+                </div>
+                <Switch
+                  id="notifications"
+                  checked={notificationsEnabled}
+                  onCheckedChange={async (checked) => {
+                    // If enabling, request Notification permission first
+                    if (checked) {
+                      if (
+                        typeof window !== "undefined" &&
+                        "Notification" in window
+                      ) {
+                        try {
+                          const permission =
+                            await Notification.requestPermission();
+                          if (permission !== "granted") {
+                            try {
+                              const { toast } = await import("sonner");
+                              toast.error("Desktop notifications blocked");
+                            } catch {}
+                            setNotificationsEnabled(false);
+                            return;
+                          } else {
+                            try {
+                              const { toast } = await import("sonner");
+                              toast.success("Desktop notifications enabled");
+                            } catch {}
+                          }
+                        } catch (err) {
+                          try {
+                            const { toast } = await import("sonner");
+                            toast.error(
+                              "Failed to request notification permission"
+                            );
+                          } catch {}
+                          setNotificationsEnabled(false);
+                          return;
+                        }
+                      } else {
+                        try {
+                          const { toast } = await import("sonner");
+                          toast.error(
+                            "Notifications are not supported in this environment"
+                          );
+                        } catch {}
+                        setNotificationsEnabled(false);
+                        return;
+                      }
+                    } else {
+                      // disabling locally is fine
+                      try {
+                        const { toast } = await import("sonner");
+                        toast("Desktop notifications disabled");
+                      } catch {}
+                    }
+
+                    setNotificationsEnabled(checked);
+                    setHasChanges(true);
+
+                    // Auto-save this toggle for logged-in users
+                    try {
+                      const toSave = {
+                        ...settings,
+                        notificationsEnabled: checked,
+                        soundEnabled,
+                      };
+                      await persistSettings(toSave);
+                    } catch (e) {
+                      console.error("Error auto-saving notifications:", e);
+                    }
+                  }}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Sound */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="sound" className="text-base font-medium">
+                      Session Sounds
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Play different sounds for work sessions, short breaks, and long breaks
+                    </p>
+                  </div>
+                  <Switch
+                    id="sound"
+                    checked={soundEnabled}
+                    onCheckedChange={(c) => {
+                      setSoundEnabled(c);
+                      setHasChanges(true);
+                      // Auto-save this toggle for logged-in users
+                      (async () => {
+                        try {
+                        const toSave = {
+                          ...settings,
+                          notificationsEnabled,
+                          soundEnabled: c,
+                        };
+                          await persistSettings(toSave);
+                        } catch (e) {
+                          console.error("Error auto-saving sound:", e);
+                        }
+                      })();
+                    }}
+                  />
+                </div>
+                
+                {soundEnabled && (
+                  <div className="pl-4 border-l-2 border-muted">
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>• Work sessions: Higher pitch (A5) - 1.2s duration</p>
+                      <p>• Short breaks: Medium pitch (E5) - 0.8s duration</p>
+                      <p>• Long breaks: Lower pitch (A4) - 1.5s duration</p>
+                      <p className="text-xs">Sounds respect your system volume settings</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
