@@ -1,136 +1,80 @@
+<p align="center">
+  <img src="/pomotide-cover.jpg" alt="Pomotide cover" />
+</p>
+
 # Pomotide
 
-> A modern, minimal Pomodoro timer built with Next.js and Supabase — designed for focus, task management, and session tracking.
+Catch the tide of productivity. A clean, fast Pomodoro app with tasks, real statistics, and per‑user settings.
 
-This repository contains the source for Pomotide, a clean and responsive Pomodoro app featuring task management, session history, and user authentication via Supabase.
+<p align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" />
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" />
+  <img alt="Radix UI" src="https://img.shields.io/badge/Radix%20UI-161618?style=for-the-badge&logo=radixui&logoColor=white" />
+  <img alt="Recharts" src="https://img.shields.io/badge/Recharts-FF6384?style=for-the-badge" />
+</p>
 
-## Features
+<p align="center">
+  <a href="https://pomotide.vercel.app/" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/Live%20Demo-View%20Pomotide-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo">
+  </a>
+</p>
 
-- Pomodoro timer with configurable focus/break lengths
-- Task creation and management
-- Session tracking (pomodoro sessions saved to the database)
-- User authentication (Supabase) — includes OAuth (Google)
-- Settings per user saved in Supabase
-- Clean UI components and accessibility-focused design
+## 💡 Problem
+Most Pomodoro apps either reset on reload, overcomplicate the UI, or don’t connect sessions to real tasks and stats.
 
-## Tech stack
+## ✅ Solution
+Pomotide keeps things simple and reliable — a delightful timer with task focus, accurate persistence, and meaningful statistics.
 
-- Next.js 14 (React 18)
-- TypeScript
-- Tailwind CSS
-- Supabase (Auth + Postgres)
-- Recharts, date-fns, Radix UI and a few other UI libraries
-- pnpm (lockfile present) — npm/yarn also supported
+## ✨ Key Features
+- ⏱️ Resilient timer: persists to the second across reloads and sleep
+- 🗂️ Tasks: quick add/edit/delete with “active task” linked to the timer
+- 📊 Real stats: Supabase-backed, with Week | Month | Year ranges
+- ⚙️ Per-user settings: durations, auto-starts, cycle length, etc.
+- 🔔 Desktop notifications and 🔉 optional session sounds
+- 👤 Guest mode → seamless local-to-cloud migration when you sign in
+- 📱 Responsive, accessible UI (shadcn/ui + Tailwind)
 
-See `package.json` for the full dependency list.
+## 🚀 Deployment
+Designed for Vercel. Just set environment variables and deploy.
 
-## Quick start
+## 🧭 Notes
+- Statistics ranges are fully wired via `useStatistics(timeRange)`.
+- “Reset Settings” restores default values in the UI; click “Save” to persist to Supabase.
 
-Requirements:
+## 🍴 If you want to fork — here’s how
+1) Install
 
-- Node.js 18+ (recommended)
-- A Supabase project (for Auth and a Postgres database)
-
-1. Clone the repo
-
-   git clone <repository-url>
-   cd pomotide-app
-
-2. Install dependencies
-
-   Using pnpm (recommended because a `pnpm-lock.yaml` is present):
-
-   pnpm install
-
-   Or with npm:
-
-   npm install
-
-3. Environment variables
-
-Create a `.env.local` file in the project root and add the following (replace the placeholders with values from your Supabase project):
-
+```bash
+pnpm install
+# or
+npm install
 ```
+
+2) Env vars (create `.env.local`)
+
+```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-# Optional: used as the OAuth redirect during development
+# Optional (local OAuth redirect)
 NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL=http://localhost:3000
 ```
 
-Notes:
+3) Database
+- Run the SQL in `scripts/001_create_tables.sql` (and subsequent scripts) inside Supabase.
 
-- The app uses `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `lib/supabase/client.ts` and `lib/supabase/server.ts`.
-- OAuth sign-in (Google) uses `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL` if provided (see `lib/hooks/use-auth.tsx`).
+4) Run locally
 
-4. Database setup
-
-- There's an example SQL file at `scripts/001_create_tables.sql` with the table creation statements used by the app. You can run this from the Supabase SQL Editor or with psql against your database.
-
-5. Run the dev server
-
-```
+```bash
 pnpm dev
 # or
 npm run dev
 ```
 
-The app will be available at http://localhost:3000.
+## 🤝 Contributing
+Small, focused PRs welcome. Please follow existing style and keep changes scoped.
 
-## Available scripts
-
-The following scripts are defined in `package.json`:
-
-- `dev` — start Next.js in development mode
-- `build` — build the production app (`next build`)
-- `start` — run the built app (`next start`)
-- `lint` — run the Next.js linting configuration
-
-Run them with `pnpm` or `npm`, for example `pnpm build` or `npm run build`.
-
-## Auth / OAuth notes
-
-- The app uses Supabase Auth. You can enable OAuth providers (like Google) in your Supabase project's Authentication > Providers settings.
-- Make sure your provider settings include the redirect URL used by the app (for local dev: `http://localhost:3000` or the value set in `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL`).
-
-## Project structure (high level)
-
-- `app/` — Next.js App Routes + pages
-- `components/` — UI components and small feature components (timer, tasks, etc.)
-- `lib/` — utilities and hooks; `lib/supabase` contains Supabase client helpers
-- `scripts/` — SQL migration/example scripts (e.g. `001_create_tables.sql`)
-- `styles/` — Tailwind / global styles
-
-## Contributing
-
-Contributions are welcome. A few suggested ways to help:
-
-- Open issues for bugs or feature requests
-- Fork and create pull requests for small, focused changes
-- Add or improve tests and type coverage
-
-Please follow existing code style and keep PRs focused (one change per PR is easiest to review).
-
-## Roadmap ideas
-
-- User preferences sync and import/export
-- More granular session statistics and charts
-- Mobile improvements and PWA support
-- Better onboarding/tutorial flows
-
-## Acknowledgements
-
-Built with a number of excellent open-source libraries including Next.js, Supabase, Tailwind CSS, Radix UI and Recharts.
-
-## License
-
-This repository does not include a license file. If you plan to publish this project, add a `LICENSE` (MIT, Apache-2.0, etc.) to make terms clear.
-
----
-
-If you'd like, I can also:
-
-- Add a small demo GIF or screenshots to the README (you can provide images or I can add placeholders),
-- Create a basic `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`, or
-- Wire up a GitHub Actions workflow for basic lint/build checks.
-
-Tell me which of those you'd like next.
+## 📄 License
+No license file yet. If you plan to publish, add one (MIT, Apache‑2.0, etc.).
