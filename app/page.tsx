@@ -308,8 +308,8 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
+      <main className="flex-1 container mx-auto px-4 py-8 flex items-center justify-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0 w-full">
           {/* Timer Section */}
           <div className="flex flex-col space-y-6">
             <Card className="flex-1 flex flex-col">
@@ -360,7 +360,7 @@ export default function HomePage() {
           </div>
 
           {/* Tasks Section */}
-          <div className="flex flex-col">
+          <div className="flex flex-col h-full">
             <TaskList
               tasks={tasks}
               activeTaskId={activeTask?.id}
