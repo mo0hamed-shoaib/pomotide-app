@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./use-auth";
+import { showErrorToast } from "@/lib/error-handling";
 import type { TimerState } from "@/components/timer/pomodoro-timer";
 
 interface PomodoroSession {
@@ -43,8 +44,7 @@ export function usePomodoroSessions() {
   const recordSession = async (
     taskId: string | null,
     sessionType: TimerState,
-    durationMinutes: number,
-    productivityRating?: number
+    durationMinutes: number
   ): Promise<number | null> => {
     if (!user) {
       const newSession: PomodoroSession = {
@@ -52,7 +52,6 @@ export function usePomodoroSessions() {
         taskId,
         sessionType,
         durationMinutes,
-        productivityRating,
         completedAt: new Date(),
       };
       const sessions = loadFromLocalStorage();
@@ -71,7 +70,6 @@ export function usePomodoroSessions() {
         task_id: taskId,
         session_type: sessionType,
         duration_minutes: durationMinutes,
-        productivity_rating: productivityRating,
       });
 
       if (error) throw error;
@@ -87,7 +85,7 @@ export function usePomodoroSessions() {
             .single();
 
           const current = !settingsError
-            ? (settingsData as any)?.total_completed_pomodoros ?? 0
+            ? (settingsData as { total_completed_pomodoros?: number })?.total_completed_pomodoros ?? 0
             : 0;
 
           const { data: updatedData, error: incError } = await supabase
@@ -99,16 +97,16 @@ export function usePomodoroSessions() {
 
           if (incError) throw incError;
 
-          return (updatedData as any)?.total_completed_pomodoros ?? current + 1;
+          return (updatedData as { total_completed_pomodoros?: number })?.total_completed_pomodoros ?? current + 1;
         } catch (err) {
-          console.error("Error incrementing total_completed_pomodoros:", err);
+          await showErrorToast(err, "increment-total-pomodoros");
           return null;
         }
       }
 
       return null;
     } catch (error) {
-      console.error("Error recording session:", error);
+      await showErrorToast(error, "record-session");
       return null;
     }
   };
@@ -161,7 +159,7 @@ export function usePomodoroSessions() {
 
       return data;
     } catch (error) {
-      console.error("Error fetching session stats:", error);
+      await showErrorToast(error, "fetch-session-stats");
       return null;
     }
   };
