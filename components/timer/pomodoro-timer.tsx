@@ -963,12 +963,7 @@ export function PomodoroTimer({
             </div>
 
             <div className="text-sm text-muted-foreground w-full sm:w-auto mt-2 sm:mt-0">
-              {currentTask ? (
-                <span>
-                </span>
-              ) : (
-                <span>Session: {completedPomodoros} completed</span>
-              )}
+              <span>Session: {completedPomodoros} completed</span>
             </div>
           </div>
 
