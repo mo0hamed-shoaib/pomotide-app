@@ -183,7 +183,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
@@ -308,8 +308,8 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-8 h-[calc(100vh-12rem)]">
+      <main className="flex-1 container mx-auto px-4 py-8 pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
           {/* Timer Section */}
           <div className="flex flex-col space-y-6">
             <Card className="flex-1 flex flex-col">
@@ -360,7 +360,7 @@ export default function HomePage() {
           </div>
 
           {/* Tasks Section */}
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col">
             <TaskList
               tasks={tasks}
               activeTaskId={activeTask?.id}
@@ -376,7 +376,7 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-card mt-auto">
+      <footer className="border-t bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
             <a 
