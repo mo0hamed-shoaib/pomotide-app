@@ -10,8 +10,6 @@ export interface Task {
   id: string
   title: string
   description?: string
-  estimatedPomodoros: number
-  completedPomodoros: number
   status: "pending" | "in_progress" | "completed"
   createdAt: Date
 }
@@ -35,7 +33,6 @@ export function TaskCard({
   onDuplicate,
   onSelect,
 }: TaskCardProps) {
-  const progress = task.estimatedPomodoros > 0 ? (task.completedPomodoros / task.estimatedPomodoros) * 100 : 0
   const isCompleted = task.status === "completed"
 
   const getBorderColor = () => {
@@ -140,24 +137,6 @@ export function TaskCard({
             </div>
           </div>
 
-          {/* Progress */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progress</span>
-              <span className="font-mono">
-                {task.completedPomodoros}/{task.estimatedPomodoros}
-              </span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div
-                className={cn(
-                  "h-2 rounded-full transition-all duration-300",
-                  isCompleted ? "bg-chart-4" : "bg-primary",
-                )}
-                style={{ width: `${Math.min(progress, 100)}%` }}
-              />
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>

@@ -56,8 +56,6 @@ export function useTasks() {
         id: task.id,
         title: task.title,
         description: task.description,
-        estimatedPomodoros: task.estimated_pomodoros,
-        completedPomodoros: task.completed_pomodoros,
         status: task.status,
         createdAt: new Date(task.created_at),
       }))
@@ -73,14 +71,12 @@ export function useTasks() {
   }
 
   // Add new task
-  const addTask = async (taskData: Omit<Task, "id" | "createdAt" | "completedPomodoros" | "status">) => {
+  const addTask = async (taskData: Omit<Task, "id" | "createdAt" | "status">) => {
     if (!user) {
       const newTask: Task = {
         id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: taskData.title,
         description: taskData.description,
-        estimatedPomodoros: taskData.estimatedPomodoros,
-        completedPomodoros: 0,
         status: "pending",
         createdAt: new Date(),
       }
@@ -97,8 +93,6 @@ export function useTasks() {
           user_id: user.id,
           title: taskData.title,
           description: taskData.description,
-          estimated_pomodoros: taskData.estimatedPomodoros,
-          completed_pomodoros: 0,
           status: "pending",
         })
         .select()
@@ -110,8 +104,6 @@ export function useTasks() {
         id: data.id,
         title: data.title,
         description: data.description,
-        estimatedPomodoros: data.estimated_pomodoros,
-        completedPomodoros: data.completed_pomodoros,
         status: data.status,
         createdAt: new Date(data.created_at),
       }
@@ -135,8 +127,6 @@ export function useTasks() {
       const dbUpdates: any = {}
       if (updates.title !== undefined) dbUpdates.title = updates.title
       if (updates.description !== undefined) dbUpdates.description = updates.description
-      if (updates.estimatedPomodoros !== undefined) dbUpdates.estimated_pomodoros = updates.estimatedPomodoros
-      if (updates.completedPomodoros !== undefined) dbUpdates.completed_pomodoros = updates.completedPomodoros
       if (updates.status !== undefined) dbUpdates.status = updates.status
 
       const { error } = await supabase.from("tasks").update(dbUpdates).eq("id", taskId).eq("user_id", user.id)

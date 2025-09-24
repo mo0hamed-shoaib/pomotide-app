@@ -30,8 +30,6 @@ interface PomodoroTimerProps {
   currentTask?: {
     id: string;
     title: string;
-    estimatedPomodoros: number;
-    completedPomodoros: number;
   } | null;
   externalState?: TimerState;
   externalStateSource?: "tab" | "arrow"; // Added to differentiate between tab and arrow navigation
@@ -769,12 +767,6 @@ export function PomodoroTimer({
               <h3 className="font-medium text-lg text-balance">
                 {currentTask.title}
               </h3>
-              <div className="flex items-center justify-center gap-2">
-                <Badge variant="outline">
-                  {currentTask.completedPomodoros}/
-                  {currentTask.estimatedPomodoros} Pomodoros
-                </Badge>
-              </div>
             </div>
           )}
 
@@ -973,8 +965,6 @@ export function PomodoroTimer({
             <div className="text-sm text-muted-foreground w-full sm:w-auto mt-2 sm:mt-0">
               {currentTask ? (
                 <span>
-                  Task: {currentTask.completedPomodoros}/
-                  {currentTask.estimatedPomodoros}
                 </span>
               ) : (
                 <span>Session: {completedPomodoros} completed</span>

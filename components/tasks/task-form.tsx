@@ -8,13 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Plus, X } from "lucide-react"
 
 interface TaskFormData {
   title: string
   description: string
-  estimatedPomodoros: number
 }
 
 interface TaskFormProps {
@@ -28,7 +25,6 @@ export function TaskForm({ onSubmit, onCancel, initialData, isEditing = false }:
   const [formData, setFormData] = useState<TaskFormData>({
     title: initialData?.title || "",
     description: initialData?.description || "",
-    estimatedPomodoros: initialData?.estimatedPomodoros || 1,
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -36,17 +32,11 @@ export function TaskForm({ onSubmit, onCancel, initialData, isEditing = false }:
     if (formData.title.trim()) {
       onSubmit(formData)
       if (!isEditing) {
-        setFormData({ title: "", description: "", estimatedPomodoros: 1 })
+        setFormData({ title: "", description: "" })
       }
     }
   }
 
-  const adjustPomodoros = (delta: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      estimatedPomodoros: Math.max(1, prev.estimatedPomodoros + delta),
-    }))
-  }
 
   return (
     <Card>
@@ -66,33 +56,6 @@ export function TaskForm({ onSubmit, onCancel, initialData, isEditing = false }:
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="pomodoros">Estimated Pomodoros</Label>
-            <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => adjustPomodoros(-1)}
-                disabled={formData.estimatedPomodoros <= 1}
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <Badge variant="secondary" className="px-4 py-2 text-base font-mono">
-                {formData.estimatedPomodoros}
-              </Badge>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => adjustPomodoros(1)}
-                className="h-8 w-8"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="description">Notes (optional)</Label>
