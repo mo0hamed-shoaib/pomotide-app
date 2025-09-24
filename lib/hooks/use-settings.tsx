@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./use-auth";
+import { showErrorToast, showSuccessToast } from "@/lib/error-handling";
 
 export interface UserSettings {
   workDuration: number;
@@ -10,6 +11,9 @@ export interface UserSettings {
   longBreakDuration: number;
   autoStartBreaks: boolean;
   autoStartPomodoros: boolean;
+  autoStartOnNavigation?: boolean;
+  notificationsEnabled?: boolean;
+  soundEnabled?: boolean;
   autoCheckCompletedTasks: boolean;
   cycleLength?: number;
 }
@@ -20,6 +24,9 @@ const defaultSettings: UserSettings = {
   longBreakDuration: 15,
   autoStartBreaks: true,
   autoStartPomodoros: true,
+  autoStartOnNavigation: true,
+  notificationsEnabled: false,
+  soundEnabled: false,
   autoCheckCompletedTasks: false,
   cycleLength: 4,
 };
@@ -85,12 +92,18 @@ export function useSettings() {
           longBreakDuration: data.long_break_duration,
           autoStartBreaks: data.auto_start_breaks,
           autoStartPomodoros: data.auto_start_pomodoros,
+          autoStartOnNavigation:
+            data.auto_start_on_navigation ??
+            defaultSettings.autoStartOnNavigation,
+          notificationsEnabled:
+            data.notifications_enabled ?? defaultSettings.notificationsEnabled,
+          soundEnabled: data.sound_enabled ?? defaultSettings.soundEnabled,
           autoCheckCompletedTasks: data.auto_check_completed_tasks,
           cycleLength: data.cycle_length ?? defaultSettings.cycleLength,
         });
       }
     } catch (error) {
-      console.error("Error fetching settings:", error);
+      await showErrorToast(error, "fetch-settings");
       const localSettings = loadFromLocalStorage();
       setSettings(localSettings);
     } finally {
@@ -107,25 +120,48 @@ export function useSettings() {
     }
 
     try {
-      const { error } = await supabase
-        .from("user_settings")
-        .upsert({
-          id: user.id,
-          work_duration: newSettings.workDuration,
-          short_break_duration: newSettings.shortBreakDuration,
-          long_break_duration: newSettings.longBreakDuration,
-          auto_start_breaks: newSettings.autoStartBreaks,
-          auto_start_pomodoros: newSettings.autoStartPomodoros,
-          auto_check_completed_tasks: newSettings.autoCheckCompletedTasks,
-          cycle_length: newSettings.cycleLength ?? defaultSettings.cycleLength,
-        })
-        .eq("id", user.id);
+      // Only send columns that exist in the current database schema
+      const updatePayload: Record<string, unknown> = {
+        work_duration: newSettings.workDuration,
+        short_break_duration: newSettings.shortBreakDuration,
+        long_break_duration: newSettings.longBreakDuration,
+        auto_start_breaks: newSettings.autoStartBreaks,
+        auto_start_pomodoros: newSettings.autoStartPomodoros,
+        auto_check_completed_tasks: newSettings.autoCheckCompletedTasks,
+      };
+      if (typeof newSettings.notificationsEnabled !== "undefined") {
+        updatePayload.notifications_enabled = newSettings.notificationsEnabled;
+      }
+      if (typeof newSettings.soundEnabled !== "undefined") {
+        updatePayload.sound_enabled = newSettings.soundEnabled;
+      }
+      if (typeof newSettings.autoStartOnNavigation !== "undefined") {
+        updatePayload.auto_start_on_navigation = newSettings.autoStartOnNavigation;
+      }
+      if (typeof newSettings.cycleLength !== "undefined") {
+        updatePayload.cycle_length = newSettings.cycleLength;
+      }
 
-      if (error) throw error;
+      // Try update first (row should already exist via signup trigger)
+      const { error: updateError, count } = await supabase
+        .from("user_settings")
+        .update(updatePayload, { count: "exact" })
+        .eq("id", user.id);
+      if (updateError) throw updateError;
+
+      // If no row was updated (defensive), insert a new one
+      if ((count ?? 0) === 0) {
+        const insertPayload = { id: user.id, ...updatePayload };
+        const { error: insertError } = await supabase
+          .from("user_settings")
+          .insert(insertPayload);
+        if (insertError) throw insertError;
+      }
 
       setSettings(newSettings);
+      await showSuccessToast("Settings saved successfully");
     } catch (error) {
-      console.error("Error saving settings:", error);
+      await showErrorToast(error, "save-settings");
     }
   };
 
