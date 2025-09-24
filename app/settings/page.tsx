@@ -420,21 +420,20 @@ export default function SettingsPage() {
                   </p>
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-muted-foreground">Status:</span>
-                    <Badge variant={typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted" ? "default" : "secondary"}>
-                      {typeof window !== "undefined" && "Notification" in window 
-                        ? Notification.permission === "granted" ? "Allowed" : "Denied"
-                        : "Not supported"
-                      }
+                    <Badge variant={notificationsEnabled ? "default" : "secondary"}>
+                      {notificationsEnabled ? "Enabled" : "Disabled"}
                     </Badge>
-                    {notificationsEnabled && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted" && (
+                    {notificationsEnabled && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          new Notification("Test Notification", {
-                            body: "This is a test notification from Pomotide",
-                            icon: "/placeholder-logo.svg"
-                          });
+                          if (typeof window !== "undefined" && "Notification" in window) {
+                            new Notification("Test Notification", {
+                              body: "This is a test notification from Pomotide",
+                              icon: "/placeholder-logo.svg"
+                            });
+                          }
                         }}
                       >
                         Test
