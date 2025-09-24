@@ -197,9 +197,9 @@ export default function HomePage() {
               <h1 className="text-2xl font-bold">Pomotide</h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {/* Statistics & Settings next to theme toggle (moved before theme) */}
-              <nav className="flex items-center gap-2">
+              <nav className="flex items-center gap-1">
                 <Link href="/statistics">
                   <Button variant="ghost" size="sm">
                     <BarChart3 className="h-4 w-4 sm:mr-2 mr-0" />
@@ -308,7 +308,7 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8 pb-16">
+      <main className="flex-1 container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
           {/* Timer Section */}
           <div className="flex flex-col space-y-6">
