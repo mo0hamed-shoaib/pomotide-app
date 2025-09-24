@@ -54,7 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}`,
+        // In production, always use the current origin; in dev allow overriding
+        redirectTo:
+          process.env.NODE_ENV === "production"
+            ? `${window.location.origin}`
+            : process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}`,
       },
     })
     return { error }
