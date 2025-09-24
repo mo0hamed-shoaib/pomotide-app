@@ -421,10 +421,7 @@ export default function SettingsPage() {
                             setNotificationsEnabled(false);
                             return;
                           } else {
-                            try {
-                              const { toast } = await import("sonner");
-                              toast.success("Desktop notifications enabled");
-                            } catch {}
+                            // Permission granted: just enable locally and mark as changed
                           }
                         } catch (err) {
                           try {
@@ -447,11 +444,7 @@ export default function SettingsPage() {
                         return;
                       }
                     } else {
-                      // disabling locally is fine
-                      try {
-                        const { toast } = await import("sonner");
-                        toast("Desktop notifications disabled");
-                      } catch {}
+                      // Disabling locally: no toast to avoid duplicates
                     }
 
                     setNotificationsEnabled(checked);

@@ -379,6 +379,10 @@ export default function HomePage() {
       <footer className="border-t bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <img src="/jimmy-logo.svg" alt="Jimmy" width="16" height="16" />
+              Jimmy
+            </span>
             <a 
               href={process.env.NEXT_PUBLIC_GITHUB_URL} 
               target="_blank" 
@@ -395,7 +399,6 @@ export default function HomePage() {
             >
               <Linkedin className="h-4 w-4" />
             </a>
-            <span>Pomotide by Jimmy</span>
           </div>
         </div>
       </footer>
