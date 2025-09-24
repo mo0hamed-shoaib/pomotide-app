@@ -20,6 +20,8 @@ interface Settings {
   autoStartPomodoros: boolean;
   autoCheckCompletedTasks: boolean;
   cycleLength?: number;
+  notificationsEnabled?: boolean;
+  soundEnabled?: boolean;
 }
 
 const defaultSettings: Settings = {
@@ -416,6 +418,29 @@ export default function SettingsPage() {
                     Show desktop notifications when a session completes (will
                     request permission when enabled)
                   </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge variant={typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted" ? "default" : "secondary"}>
+                      {typeof window !== "undefined" && "Notification" in window 
+                        ? Notification.permission === "granted" ? "Allowed" : "Denied"
+                        : "Not supported"
+                      }
+                    </Badge>
+                    {notificationsEnabled && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          new Notification("Test Notification", {
+                            body: "This is a test notification from Pomotide",
+                            icon: "/placeholder-logo.svg"
+                          });
+                        }}
+                      >
+                        Test
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <Switch
                   id="notifications"
