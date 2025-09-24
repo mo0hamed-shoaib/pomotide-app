@@ -555,19 +555,33 @@ export function PomodoroTimer({
 
     // Notify the user via the Notification API (if enabled)
     try {
-      if (
-        notificationsEnabled &&
-        typeof window !== "undefined" &&
-        "Notification" in window &&
-        Notification.permission === "granted"
-      ) {
+      const supported = typeof window !== "undefined" && "Notification" in window;
+      const permission = supported ? Notification.permission : "n/a";
+      // Diagnostic logs (temporary; remove later if noisy)
+      console.log("[Notify] attempt", {
+        enabled: notificationsEnabled,
+        supported,
+        permission,
+      });
+      if (notificationsEnabled && supported && permission === "granted") {
         const title = "Session Complete";
         const body = "Session finished — time for a break or to continue";
         try {
           new Notification(title, { body });
-        } catch {}
+          console.log("[Notify] success");
+        } catch (err) {
+          console.error("[Notify] error showing notification", err);
+        }
+      } else {
+        console.warn("[Notify] conditions not met", {
+          enabled: notificationsEnabled,
+          supported,
+          permission,
+        });
       }
-    } catch {}
+    } catch (outerErr) {
+      console.error("[Notify] outer error", outerErr);
+    }
   }, [
     timerState,
     completedPomodoros,
@@ -575,6 +589,7 @@ export function PomodoroTimer({
     onSessionComplete,
     autoStartBreaks,
     autoStartPomodoros,
+    notificationsEnabled,
   ]);
 
 
