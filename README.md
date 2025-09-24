@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/pomotide-cover.jpg" alt="Pomotide cover" />
+  <img src="public/pomotide-cover.jpg" alt="Pomotide cover" />
 </p>
 
 # Pomotide
