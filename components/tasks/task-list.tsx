@@ -15,7 +15,7 @@ interface TaskListProps {
   timerState?: "work" | "short_break" | "long_break";
   onTaskSelect: (task: Task) => void;
   onTaskAdd: (
-    task: Omit<Task, "id" | "createdAt" | "completedPomodoros" | "status">
+    task: Omit<Task, "id" | "createdAt" | "status">
   ) => void;
   onTaskEdit: (taskId: string, updates: Partial<Task>) => void;
   onTaskDelete: (taskId: string) => void;
@@ -38,7 +38,6 @@ export function TaskList({
   const handleAddTask = (taskData: {
     title: string;
     description: string;
-    estimatedPomodoros: number;
   }) => {
     onTaskAdd(taskData);
     setShowAddForm(false);
@@ -47,7 +46,6 @@ export function TaskList({
   const handleEditTask = (taskData: {
     title: string;
     description: string;
-    estimatedPomodoros: number;
   }) => {
     if (editingTask) {
       onTaskEdit(editingTask.id, taskData);
@@ -59,7 +57,6 @@ export function TaskList({
     onTaskAdd({
       title: `${task.title} (Copy)`,
       description: task.description,
-      estimatedPomodoros: task.estimatedPomodoros,
     });
   };
 
@@ -87,7 +84,7 @@ export function TaskList({
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col min-h-0 p-0">
-        <ScrollArea className="flex-1 px-6 custom-scrollbar">
+        <ScrollArea className="h-[510px] px-6">
           <div className="space-y-3 pb-6">
             {/* Add Task Form */}
             {showAddForm && (
